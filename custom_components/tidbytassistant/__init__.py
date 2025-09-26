@@ -216,7 +216,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
                 appids = []
                 data = await response.json()
                 for item in data['installations']:
-                    if item["appID"] == "":
+                    if item["appID"] == "pushed":
                         appids.append(item["id"])
                 return appids
 
