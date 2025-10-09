@@ -268,3 +268,75 @@ text:
         select:
           multiple: true
           options: *id001
+enable_app:
+  name: Enable App
+  description: Enable an installed app in the rotation.
+  fields:
+    contentid:
+      name: Content ID
+      description: The Content ID you set when publishing your app.
+      required: true
+      selector:
+        text: null
+    devicename:
+      name: Device Name
+      description: The Tidbyt device you want to enable the app on.
+      required: true
+      selector:
+        select:
+          multiple: true
+          options: *id001
+disable_app:
+  name: Disable App
+  description: Disable an installed app in the rotation.
+  fields:
+    contentid:
+      name: Content ID
+      description: The Content ID you set when publishing your app.
+      required: true
+      selector:
+        text: null
+    devicename:
+      name: Device Name
+      description: The Tidbyt device you want to disable the app on.
+      required: true
+      selector:
+        select:
+          multiple: true
+          options: *id001
+pin_app:
+  name: Pin App
+  description: Pin an installed app so it always displays.
+  fields:
+    contentid:
+      name: Content ID
+      description: The Content ID you set when publishing your app.
+      required: true
+      selector:
+        text: null
+    devicename:
+      name: Device Name
+      description: The Tidbyt device you want to pin the app on.
+      required: true
+      selector:
+        select:
+          multiple: true
+          options: *id001
+unpin_app:
+  name: Unpin App
+  description: Unpin an installed app so it returns to the rotation.
+  fields:
+    contentid:
+      name: Content ID
+      description: The Content ID you set when publishing your app.
+      required: true
+      selector:
+        text: null
+    devicename:
+      name: Device Name
+      description: The Tidbyt device you want to unpin the app on.
+      required: true
+      selector:
+        select:
+          multiple: true
+          options: *id001

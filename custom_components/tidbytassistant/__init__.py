@@ -174,9 +174,9 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
     device_name_options = [{"label": name, "value": name} for name in devicelist]
 
-    config['push']['fields']['devicename']['selector']['select']['options'] = device_name_options
-    config['delete']['fields']['devicename']['selector']['select']['options'] = device_name_options
-    config['text']['fields']['devicename']['selector']['select']['options'] = device_name_options
+    for service in config.values():
+        if 'devicename' in service['fields']:
+            service['fields']['devicename']['selector']['select']['options'] = device_name_options
 
     if has_tidbyt:
         async with aiohttp.ClientSession() as session:
@@ -194,12 +194,12 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     async with aiofiles.open(yaml_path, 'w') as file:
         await file.write(yaml.dump(config, default_flow_style=False, sort_keys=False))
 
-    async def validateid(input):
+    def validateid(input):
         """Check if the string contains only A-Z, a-z, and 0-9."""
         pattern = r'^[A-Za-z0-9]+$'
         return bool(re.match(pattern, input))
 
-    async def getinstalledapps(endpoint, deviceid, token):
+    async def getinstalledapps(endpoint, deviceid, token, only_pushed=True):
         url = f"{endpoint}/v0/devices/{deviceid}/installations"
         header = {
             "Authorization": f"Bearer {token}",
@@ -216,18 +216,25 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
                 appids = []
                 data = await response.json()
                 for item in data['installations']:
-                    if item["appID"] == "pushed":
+                    if not only_pushed or item["appID"] == "pushed":
                         appids.append(item["id"])
                 return appids
 
-    async def command(webhook_url, payload, headers=None):
+    async def request(method, webhook_url, payload, headers=None):
         async with aiohttp.ClientSession() as session:
-            async with session.post(webhook_url, json=payload, headers=headers) as response:
+            async with session.request(method, webhook_url, json=payload, headers=headers) as response:
                 status = f"{response.status}"
                 if status != "200":
                     error = await response.text()
                     _LOGGER.error(f"{error}")
                     raise HomeAssistantError(f"{error}")
+
+    def tronbyt_headers(token):
+        return {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
 
     async def handle_push_or_text(call: ServiceCall, is_text: bool) -> None:
         webhook_url = f"{url}/push"
@@ -270,17 +277,12 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
                     is_tronbyt = item.get(CONF_TRONBYT, False)
                     if is_tronbyt:
                         api_url = f"{item[CONF_API_URL]}/v0/devices/{deviceid}/push_app"
-                        header = {
-                            "Authorization": f"Bearer {token}",
-                            "Content-Type": "application/json",
-                            "Accept": "application/json",
-                        }
                         body = {
                             "config": arguments,
                             "app_id": content,
                             "installationID": contentid,
                         }
-                        await command(api_url, body, headers=header)
+                        await request("POST", api_url, body, headers=tronbyt_headers(token))
                     else:
                         todo = {
                             "content": content,
@@ -295,7 +297,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
                             todo["texttype"] = texttype
                         if CONF_API_URL in item:
                             todo["base_url"] = item[CONF_API_URL]
-                        await command(webhook_url, todo)
+                        await request("POST", webhook_url, todo)
 
     async def pixlet_push(call: ServiceCall) -> None:
         await handle_push_or_text(call, is_text=False)
@@ -323,22 +325,51 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
                         raise HomeAssistantError(f"The Content ID you entered is not an installed app on {device}. Currently installed apps are: {validids}")
                     
                     url = f"{base_url}/v0/devices/{deviceid}/installations/{contentid}"
-                    header = {
-                        "Authorization": f"Bearer {token}",
-                        "Content-Type": "application/json",
-                        "Accept": "application/json",
-                    }
-                    async with aiohttp.ClientSession() as session:
-                        async with session.delete(url, headers=header) as response:
-                            status = f"{response.status}"
-                            if status != "200":
-                                error = await response.text()
-                                _LOGGER.error(f"{error}")
-                                raise HomeAssistantError(f"{error}")
+                    await request("DELETE", url, {}, headers=tronbyt_headers(token))
+
+    async def handle_installation_update(call: ServiceCall, payload: dict) -> None:
+        contentid = call.data.get(ATTR_CONTENT_ID)
+        if not validateid(contentid):
+            _LOGGER.error("Content ID must contain characters A-Z, a-z or 0-9")
+            raise HomeAssistantError("Content ID must contain characters A-Z, a-z or 0-9")
+
+        devicename = call.data.get(ATTR_DEVICENANME)
+        for device in devicename:
+            for item in conf[CONF_DEVICE]:
+                if item[CONF_NAME] == device:
+                    token = item[CONF_TOKEN]
+                    deviceid = item[CONF_ID]
+                    base_url = item.get(CONF_API_URL, DEFAULT_API_URL)
+
+                    validids = await getinstalledapps(base_url, deviceid, token, only_pushed=False)
+                    if contentid not in validids:
+                        _LOGGER.error(f"The Content ID you entered is not an installed app on {device}. Currently installed apps are: {validids}")
+                        raise HomeAssistantError(f"The Content ID you entered is not an installed app on {device}. Currently installed apps are: {validids}")
+
+                    endpoint = f"{base_url}/v0/devices/{deviceid}/installations/{contentid}"
+                    await request("PATCH", endpoint, payload, headers=tronbyt_headers(token))
+
+    async def pixlet_enable(call: ServiceCall) -> None:
+        await handle_installation_update(call, {"set_enabled": True})
+
+    async def pixlet_disable(call: ServiceCall) -> None:
+        await handle_installation_update(call, {"set_enabled": False})
+
+    async def pixlet_pin(call: ServiceCall) -> None:
+        await handle_installation_update(call, {"set_pinned": True})
+
+    async def pixlet_unpin(call: ServiceCall) -> None:
+        await handle_installation_update(call, {"set_pinned": False})
 
     hass.services.async_register(DOMAIN, "push", pixlet_push)
     hass.services.async_register(DOMAIN, "text", pixlet_text)
     hass.services.async_register(DOMAIN, "delete", pixlet_delete)
+
+    if not has_tidbyt:
+        hass.services.async_register(DOMAIN, "enable_app", pixlet_enable)
+        hass.services.async_register(DOMAIN, "disable_app", pixlet_disable)
+        hass.services.async_register(DOMAIN, "pin_app", pixlet_pin)
+        hass.services.async_register(DOMAIN, "unpin_app", pixlet_unpin)
 
     hass.data[DOMAIN] = conf
     load_platform(hass, 'light', DOMAIN, {}, config)
