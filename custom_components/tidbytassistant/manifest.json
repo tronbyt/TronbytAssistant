@@ -4,6 +4,7 @@
   "codeowners": ["@savdagod"],
   "documentation": "https://github.com/savdagod/TidbytAssistant",
   "iot_class": "cloud_polling",
+  "config_flow": true,
   "loggers": ["custom_components.tidbytassistant"],
   "single_config_entry": true,
   "version": "2025.6.1"

@@ -29,6 +29,15 @@ This is the way i recommend you install this integration so that you can stay up
 Copy the entirety of custom_components/tidbytassistant to your /config/custom_components folder. You can do this using ***Samba***.
 
 ## Configuration
+### Home Assistant UI (recommended)
+1. Navigate to **Settings → Devices & Services → Add Integration** and search for **TidbytAssistant**.
+2. Enter the host, port, and whether you use an external add-on container when prompted.
+3. Add each Tidbyt or Tronbyt device by supplying the Device ID, Key, optional display name, and custom API endpoint if needed.
+4. Finish the flow; entities and services will be created automatically.
+
+> Existing YAML configurations are imported into the UI the first time you install this release, so you can keep managing devices from the new flow.
+
+### YAML (legacy)
 1. To add your Tidbyt device, open the Tidbyt app. Navigate to the device you want to add, click the settings icon at the top right then navigate to the Developer tab.
 2. Tap on Get API key. Here you will see a Device ID and Key. This is what you will use to set up the integration.
 3. In HomeAssistant, navigate to your **configuration.yaml** and add the following to the bottom:
