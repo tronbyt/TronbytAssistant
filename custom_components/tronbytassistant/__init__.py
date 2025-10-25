@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 import os
 import re
-import time
 from collections.abc import Mapping
 from typing import Any
 
@@ -14,26 +12,20 @@ import voluptuous as vol
 import yaml
 
 from homeassistant import config_entries
-from homeassistant.components.hassio import AddonManager, AddonState
-from homeassistant.config_entries import ConfigEntry, ConfigEntryNotReady
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant, ServiceCall, callback
+from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.typing import ConfigType
 
-from .addon import get_addon_manager
 from .const import (
     DOMAIN,
     CONF_DEVICE,
     CONF_TOKEN,
     CONF_ID,
-    CONF_PORT,
-    CONF_HOST,
     CONF_NAME,
-    CONF_EXTERNALADDON,
     CONF_API_URL,
-    CONF_TRONBYT,
     ATTR_CONTENT,
     ATTR_CONTENT_ID,
     ATTR_DEVICENANME,
@@ -48,20 +40,11 @@ from .const import (
     ATTR_ARGS,
     ATTR_PUBLISH_TYPE,
     ATTR_LANG,
-    ADDON_MIN_VERSION,
-    DEFAULT_API_URL,
-    DEFAULT_HOST,
-    DEFAULT_PORT,
-    DEFAULT_EXTERNAL_ADDON,
 )
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS: list[Platform] = [Platform.LIGHT, Platform.SWITCH]
-
 DATA_CONFIG = "config"
-DATA_OPTIONAL_SERVICES = "optional_services"
-DATA_OPTIONAL_REGISTERED = "optional_registered"
 DATA_SERVICES_REGISTERED = "services_registered"
 
 DEFAULT_TITLE = ""
@@ -71,23 +54,22 @@ DEFAULT_ARGS = ""
 DEFAULT_CONTENT_ID = ""
 DEFAULT_LANG = "en"
 
-TIDBYT_SCHEMA = vol.Schema(
+PLATFORMS: list[Platform] = [Platform.LIGHT, Platform.SWITCH]
+
+DEVICE_SCHEMA = vol.Schema(
     {
+        vol.Required(CONF_API_URL): cv.string,
         vol.Optional(CONF_NAME): cv.string,
         vol.Required(CONF_ID): cv.string,
         vol.Required(CONF_TOKEN): cv.string,
-        vol.Optional(CONF_API_URL): cv.string,
-        vol.Optional(CONF_TRONBYT): cv.boolean,
     }
 )
+
 CONFIG_SCHEMA = vol.Schema(
     {
         DOMAIN: vol.Schema(
             {
-                vol.Required(CONF_DEVICE): vol.All(cv.ensure_list, [TIDBYT_SCHEMA]),
-                vol.Optional(CONF_HOST): cv.string,
-                vol.Optional(CONF_PORT): cv.string,
-                vol.Optional(CONF_EXTERNALADDON): cv.boolean,
+                vol.Required(CONF_DEVICE): vol.All(cv.ensure_list, [DEVICE_SCHEMA]),
             }
         ),
     },
@@ -96,6 +78,7 @@ CONFIG_SCHEMA = vol.Schema(
 
 
 async def getdevicename(endpoint: str, deviceid: str, token: str) -> str | None:
+    """Retrieve the Tronbyt display name for a device."""
     url = f"{endpoint}/v0/devices/{deviceid}"
     header = {
         "Authorization": f"Bearer {token}",
@@ -116,33 +99,8 @@ async def getdevicename(endpoint: str, deviceid: str, token: str) -> str | None:
     return data.get("displayName")
 
 
-@callback
-def _get_addon_manager(hass: HomeAssistant) -> AddonManager:
-    addon_manager: AddonManager = get_addon_manager(hass)
-    if addon_manager.task_in_progress():
-        raise ConfigEntryNotReady
-    return addon_manager
-
-
-def is_min_version(version1: str, version2: str) -> bool:
-    v1_parts = list(map(int, version1.split(".")))
-    v2_parts = list(map(int, version2.split(".")))
-
-    max_length = max(len(v1_parts), len(v2_parts))
-    v1_parts.extend([0] * (max_length - len(v1_parts)))
-    v2_parts.extend([0] * (max_length - len(v2_parts)))
-
-    for v1, v2 in zip(v1_parts, v2_parts):
-        if v1 > v2:
-            return True
-        if v1 < v2:
-            return False
-
-    return True
-
-
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
-    """Set up TidbytAssistant from YAML."""
+    """Support YAML imports by launching a config flow."""
     hass.data.setdefault(DOMAIN, {})
 
     if DOMAIN not in config:
@@ -167,24 +125,21 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up TidbytAssistant from a config entry."""
+    """Set up the integration from a config entry."""
     hass.data.setdefault(DOMAIN, {})
 
     conf = _clone_config(entry.data)
     hass.data[DOMAIN][DATA_CONFIG] = conf
 
     await _async_register_services(hass)
-
-    has_tidbyt = await _async_process_configuration(hass, conf)
-    _async_update_optional_services(hass, has_tidbyt)
-
+    await _async_prepare_devices(hass, conf)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Unload a config entry."""
+    """Unload the integration."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if not unload_ok:
         return False
@@ -192,47 +147,24 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     data = hass.data.get(DOMAIN)
     if data is not None:
         data.pop(DATA_CONFIG, None)
-        if data.get(DATA_OPTIONAL_REGISTERED):
-            _async_remove_optional_services(hass)
         if data.get(DATA_SERVICES_REGISTERED):
             _async_remove_services(hass)
 
     return True
 
 
-def _clone_config(value: Any) -> Any:
-    """Clone Home Assistant entry data into mutable structures."""
-    if isinstance(value, Mapping):
-        return {key: _clone_config(val) for key, val in value.items()}
-    if isinstance(value, list):
-        return [_clone_config(item) for item in value]
-    return value
-
-
-async def _async_process_configuration(
-    hass: HomeAssistant, conf: dict[str, Any]
-) -> bool:
-    """Prepare runtime data, verify connectivity and update service selectors."""
+async def _async_prepare_devices(hass: HomeAssistant, conf: dict[str, Any]) -> None:
+    """Derive device names and update the services schema."""
     devices = conf.get(CONF_DEVICE, [])
     if not devices:
-        raise HomeAssistantError("At least one Tidbyt device must be configured.")
+        raise HomeAssistantError("At least one Tronbyt device must be configured.")
 
-    host = conf.get(CONF_HOST, DEFAULT_HOST)
-    port = conf.get(CONF_PORT, DEFAULT_PORT)
-    external_addon = conf.get(CONF_EXTERNALADDON, DEFAULT_EXTERNAL_ADDON)
-    url = f"http://{host}:{port}"
-
-    has_tidbyt = False
     devicelist: list[str] = []
-
     for device in devices:
-        if not device.get(CONF_TRONBYT, False):
-            has_tidbyt = True
-
         dev_name = device.get(CONF_NAME)
         if not dev_name:
             retrievedname = await getdevicename(
-                device.get(CONF_API_URL, DEFAULT_API_URL),
+                device.get(CONF_API_URL),
                 device[CONF_ID],
                 device[CONF_TOKEN],
             )
@@ -243,52 +175,20 @@ async def _async_process_configuration(
             device[CONF_NAME] = dev_name
         devicelist.append(dev_name)
 
-    if has_tidbyt:
-        if not external_addon:
-            addon_manager = _get_addon_manager(hass)
-            addon_info = await addon_manager.async_get_addon_info()
-            addon_state = addon_info.state
-            addon_current_ver = addon_info.version
-            if addon_state == AddonState.NOT_INSTALLED:
-                _LOGGER.error(
-                    "The add-on is not installed. Make sure it is installed and try again."
-                )
-                raise ConfigEntryNotReady
-            if not is_min_version(addon_current_ver, ADDON_MIN_VERSION):
-                _LOGGER.error(
-                    "The minimum required add-on version is %s but the currently installed version is %s. Please update the add-on to the latest version.",
-                    ADDON_MIN_VERSION,
-                    addon_current_ver,
-                )
-                raise ConfigEntryNotReady
-        else:
-            timeout = time.time() + 60
-            while True:
-                try:
-                    async with aiohttp.ClientSession() as session:
-                        async with session.get(f"{url}/apps") as response:
-                            if response.status == 200:
-                                break
-                except aiohttp.ClientError:
-                    pass
-                if time.time() > timeout:
-                    _LOGGER.error(
-                        "Connection to add-on timed out after 60 seconds. Make sure it is installed or running and try again."
-                    )
-                    raise ConfigEntryNotReady
-                await asyncio.sleep(5)
-
-    await _async_update_services_yaml(hass, devicelist, has_tidbyt, url)
-
-    return has_tidbyt
+    await _async_update_services_yaml(hass, devicelist)
 
 
 async def _async_update_services_yaml(
-    hass: HomeAssistant, devicelist: list[str], has_tidbyt: bool, url: str
+    hass: HomeAssistant, devicelist: list[str]
 ) -> None:
-    """Update services.yaml selectors based on current configuration."""
+    """Patch services.yaml to reflect the configured device names."""
     config_dir = hass.config.path()
-    yaml_path = os.path.join(config_dir, "custom_components", DOMAIN, "services.yaml")
+    yaml_path = os.path.join(
+        config_dir,
+        "custom_components",
+        DOMAIN,
+        "services.yaml",
+    )
 
     try:
         async with aiofiles.open(yaml_path) as file:
@@ -299,7 +199,6 @@ async def _async_update_services_yaml(
         ) from exc
 
     services_config = yaml.safe_load(content) or {}
-
     device_name_options = [{"label": name, "value": name} for name in devicelist]
 
     for service in services_config.values():
@@ -307,28 +206,11 @@ async def _async_update_services_yaml(
         if not fields:
             continue
         devicename_field = fields.get(ATTR_DEVICENANME)
-        if devicename_field and "selector" in devicename_field:
-            selector = devicename_field["selector"].get("select")
-            if selector is not None:
-                selector["options"] = device_name_options
-
-    if has_tidbyt:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(f"{url}/apps") as response:
-                if response.status != 200:
-                    error = await response.text()
-                    _LOGGER.error("%s", error)
-                    raise HomeAssistantError(error)
-                data = await response.json()
-        content_options = [
-            {"label": item["label"], "value": item["value"]} for item in data
-        ]
-        push_fields = services_config.get("push", {}).get("fields", {})
-        content_field = push_fields.get(ATTR_CONTENT)
-        if content_field and "selector" in content_field:
-            selector = content_field["selector"].get("select")
-            if selector is not None:
-                selector["options"] = content_options
+        if not devicename_field:
+            continue
+        selector = devicename_field.get("selector", {}).get("select")
+        if selector is not None:
+            selector["options"] = device_name_options
 
     async with aiofiles.open(yaml_path, "w") as file:
         await file.write(
@@ -337,7 +219,7 @@ async def _async_update_services_yaml(
 
 
 async def _async_register_services(hass: HomeAssistant) -> None:
-    """Register domain services once."""
+    """Register the Tronbyt service handlers once."""
     data = hass.data.setdefault(DOMAIN, {})
     if data.get(DATA_SERVICES_REGISTERED):
         return
@@ -400,10 +282,6 @@ async def _async_register_services(hass: HomeAssistant) -> None:
     async def handle_push_or_text(call: ServiceCall, is_text: bool) -> None:
         conf = _get_config()
 
-        host = conf.get(CONF_HOST, DEFAULT_HOST)
-        port = conf.get(CONF_PORT, DEFAULT_PORT)
-        url = f"http://{host}:{port}/push"
-
         contentid = call.data.get(ATTR_CONTENT_ID, DEFAULT_CONTENT_ID)
         publishtype = call.data.get(ATTR_PUBLISH_TYPE)
         devicename = call.data.get(ATTR_DEVICENANME)
@@ -427,7 +305,13 @@ async def _async_register_services(hass: HomeAssistant) -> None:
             if args != "":
                 parts = args.split(";")
                 for pair in parts:
-                    key, value = pair.split("=")
+                    if not pair:
+                        continue
+                    if "=" not in pair:
+                        raise HomeAssistantError(
+                            "Arguments must be provided as key=value pairs separated by ';'"
+                        )
+                    key, value = pair.split("=", maxsplit=1)
                     arguments[key] = value
 
             match contenttype:
@@ -446,30 +330,15 @@ async def _async_register_services(hass: HomeAssistant) -> None:
 
                 token = item[CONF_TOKEN]
                 deviceid = item[CONF_ID]
-                is_tronbyt = item.get(CONF_TRONBYT, False)
-                if is_tronbyt:
-                    api_url = f"{item.get(CONF_API_URL, DEFAULT_API_URL)}/v0/devices/{deviceid}/push_app"
-                    body = {
-                        "config": arguments,
-                        "app_id": content,
-                        "installationID": contentid,
-                    }
-                    await request("POST", api_url, body, headers=tronbyt_headers(token))
-                else:
-                    todo: dict[str, Any] = {
-                        "content": content,
-                        "contentid": contentid,
-                        "contenttype": contenttype,
-                        "publishtype": publishtype,
-                        "token": token,
-                        "deviceid": deviceid,
-                        "starargs": arguments,
-                    }
-                    if is_text:
-                        todo["texttype"] = texttype
-                    if CONF_API_URL in item:
-                        todo["base_url"] = item[CONF_API_URL]
-                    await request("POST", url, todo)
+                api_url = f"{item.get(CONF_API_URL)}/v0/devices/{deviceid}/push_app"
+                body = {
+                    "config": arguments,
+                    "app_id": content,
+                    "installationID": contentid,
+                }
+                if publishtype:
+                    body["publish"] = publishtype
+                await request("POST", api_url, body, headers=tronbyt_headers(token))
 
     async def pixlet_push(call: ServiceCall) -> None:
         await handle_push_or_text(call, is_text=False)
@@ -495,7 +364,7 @@ async def _async_register_services(hass: HomeAssistant) -> None:
 
                 token = item[CONF_TOKEN]
                 deviceid = item[CONF_ID]
-                base_url = item.get(CONF_API_URL, DEFAULT_API_URL)
+                base_url = item.get(CONF_API_URL)
 
                 validids = await getinstalledapps(base_url, deviceid, token)
                 if contentid not in validids:
@@ -528,14 +397,10 @@ async def _async_register_services(hass: HomeAssistant) -> None:
             for item in conf[CONF_DEVICE]:
                 if item[CONF_NAME] != device:
                     continue
-                if not item.get(CONF_TRONBYT, False):
-                    raise HomeAssistantError(
-                        f"{device} is not configured as a Tronbyt device."
-                    )
 
                 token = item[CONF_TOKEN]
                 deviceid = item[CONF_ID]
-                base_url = item.get(CONF_API_URL, DEFAULT_API_URL)
+                base_url = item.get(CONF_API_URL)
 
                 validids = await getinstalledapps(
                     base_url, deviceid, token, only_pushed=False
@@ -570,45 +435,33 @@ async def _async_register_services(hass: HomeAssistant) -> None:
     hass.services.async_register(DOMAIN, "push", pixlet_push)
     hass.services.async_register(DOMAIN, "text", pixlet_text)
     hass.services.async_register(DOMAIN, "delete", pixlet_delete)
+    hass.services.async_register(DOMAIN, "enable_app", pixlet_enable)
+    hass.services.async_register(DOMAIN, "disable_app", pixlet_disable)
+    hass.services.async_register(DOMAIN, "pin_app", pixlet_pin)
+    hass.services.async_register(DOMAIN, "unpin_app", pixlet_unpin)
 
-    data[DATA_OPTIONAL_SERVICES] = {
-        "enable_app": pixlet_enable,
-        "disable_app": pixlet_disable,
-        "pin_app": pixlet_pin,
-        "unpin_app": pixlet_unpin,
-    }
     data[DATA_SERVICES_REGISTERED] = True
 
 
-def _async_update_optional_services(hass: HomeAssistant, has_tidbyt: bool) -> None:
-    """Register or remove Tronbyt-only services based on configuration."""
-    data = hass.data.setdefault(DOMAIN, {})
-    optional = data.get(DATA_OPTIONAL_SERVICES) or {}
-    if has_tidbyt:
-        if data.get(DATA_OPTIONAL_REGISTERED):
-            _async_remove_optional_services(hass)
-        return
-
-    if data.get(DATA_OPTIONAL_REGISTERED):
-        return
-
-    for name, handler in optional.items():
-        hass.services.async_register(DOMAIN, name, handler)
-    data[DATA_OPTIONAL_REGISTERED] = True
-
-
-def _async_remove_optional_services(hass: HomeAssistant) -> None:
-    data = hass.data.setdefault(DOMAIN, {})
-    optional = data.get(DATA_OPTIONAL_SERVICES) or {}
-    for name in optional:
-        hass.services.async_remove(DOMAIN, name)
-    data[DATA_OPTIONAL_REGISTERED] = False
-
-
 def _async_remove_services(hass: HomeAssistant) -> None:
-    """Remove all services for the domain."""
-    hass.services.async_remove(DOMAIN, "push")
-    hass.services.async_remove(DOMAIN, "text")
-    hass.services.async_remove(DOMAIN, "delete")
-    _async_remove_optional_services(hass)
+    """Remove domain services."""
+    for service in (
+        "push",
+        "text",
+        "delete",
+        "enable_app",
+        "disable_app",
+        "pin_app",
+        "unpin_app",
+    ):
+        hass.services.async_remove(DOMAIN, service)
     hass.data.setdefault(DOMAIN, {})[DATA_SERVICES_REGISTERED] = False
+
+
+def _clone_config(value: Any) -> Any:
+    """Clone Home Assistant entry data into mutable structures."""
+    if isinstance(value, Mapping):
+        return {key: _clone_config(val) for key, val in value.items()}
+    if isinstance(value, list):
+        return [_clone_config(item) for item in value]
+    return value

@@ -10,26 +10,10 @@ from homeassistant.core import callback
 from .const import (
     DOMAIN,
     CONF_DEVICE,
-    CONF_HOST,
-    CONF_PORT,
-    CONF_EXTERNALADDON,
     CONF_NAME,
     CONF_ID,
     CONF_TOKEN,
     CONF_API_URL,
-    CONF_TRONBYT,
-    DEFAULT_HOST,
-    DEFAULT_PORT,
-    DEFAULT_EXTERNAL_ADDON,
-)
-
-
-STEP_USER_SCHEMA = vol.Schema(
-    {
-        vol.Optional(CONF_HOST, default=DEFAULT_HOST): str,
-        vol.Optional(CONF_PORT, default=DEFAULT_PORT): str,
-        vol.Optional(CONF_EXTERNALADDON, default=DEFAULT_EXTERNAL_ADDON): bool,
-    }
 )
 
 STEP_DEVICE_SCHEMA = vol.Schema(
@@ -37,8 +21,7 @@ STEP_DEVICE_SCHEMA = vol.Schema(
         vol.Optional(CONF_NAME): str,
         vol.Required(CONF_ID): str,
         vol.Required(CONF_TOKEN): str,
-        vol.Optional(CONF_API_URL): str,
-        vol.Optional(CONF_TRONBYT, default=False): bool,
+        vol.Required(CONF_API_URL): str,
     }
 )
 
@@ -49,18 +32,13 @@ class TidbytAssistantConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
 
     def __init__(self) -> None:
-        self._data: dict[str, Any] = {}
         self._devices: list[dict[str, Any]] = []
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None):
         await self.async_set_unique_id(DOMAIN)
         self._abort_if_unique_id_configured()
 
-        if user_input is not None:
-            self._data.update(user_input)
-            return await self.async_step_device()
-
-        return self.async_show_form(step_id="user", data_schema=STEP_USER_SCHEMA)
+        return await self.async_step_device()
 
     async def async_step_device(self, user_input: dict[str, Any] | None = None):
         errors: dict[str, str] = {}
@@ -96,8 +74,7 @@ class TidbytAssistantConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 errors={"base": "no_devices"},
             )
 
-        data = dict(self._data)
-        data[CONF_DEVICE] = self._devices
+        data = {CONF_DEVICE: self._devices}
         title = _entry_title_from_devices(self._devices)
 
         return self.async_create_entry(title=title, data=data)
@@ -107,11 +84,6 @@ class TidbytAssistantConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._abort_if_unique_id_configured()
 
         data = {
-            CONF_HOST: user_input.get(CONF_HOST, DEFAULT_HOST),
-            CONF_PORT: user_input.get(CONF_PORT, DEFAULT_PORT),
-            CONF_EXTERNALADDON: user_input.get(
-                CONF_EXTERNALADDON, DEFAULT_EXTERNAL_ADDON
-            ),
             CONF_DEVICE: user_input.get(CONF_DEVICE, []),
         }
 
