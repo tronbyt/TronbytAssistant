@@ -1,9 +1,6 @@
 DOMAIN = "tronbytassistant"
 
-CONF_ID = "deviceid"
 CONF_TOKEN = "token"
-CONF_NAME = "name"
-CONF_DEVICE = "device"
 CONF_API_URL = "apiurl"
 ATTR_CONTENT = "content"
 ATTR_DEVICENANME = "devicename"

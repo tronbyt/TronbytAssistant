@@ -21,14 +21,15 @@ Copy the entirety of `custom_components/tronbytassistant` to your `/config/custo
 
 ## Configuration
 1. Navigate to **Settings → Devices & Services → Add Integration** and search for **TronbytAssistant**.
-2. Add each Tronbyt device by supplying the Device ID, Key, optional display name, and the base URL of your Tronbyt server (for example `https://tron.example.com`).
-3. Finish the flow; the integration will verify the devices and update the service selectors automatically.
+2. Enter the full base URL of your Tronbyt server (include `http://` or `https://`, e.g. `https://tron.example.com`) and your user API key. The same key works for every device on that server.
+3. Confirm the flow. The integration will fetch `/v0/devices`, create entities for each device automatically, and update service selectors in Home Assistant.
 
 # Features
 
 ## Entities
 - Each Tronbyt device exposes a light entity that controls display brightness (0–100%).
-- Night mode is available as a switch entity so you can toggle adaptive brightness in automations.
+- Each device also exposes an auto-dim switch so you can toggle adaptive brightness in automations.
+- Home Assistant registers one device entry per Tronbyt display, grouped under the integration named after your server hostname.
 
 ## Services
 ### TronbytAssistant: Push

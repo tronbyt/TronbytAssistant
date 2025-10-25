@@ -1,5 +1,5 @@
 {
-    "name": "TidbytAssistant",
+    "name": "TronbytAssistant",
     "render_readme": true,
     "homeassistant": "2022.11.0"
 }

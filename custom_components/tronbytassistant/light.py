@@ -10,15 +10,8 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from . import DATA_CONFIG
-from .const import (
-    CONF_API_URL,
-    CONF_DEVICE,
-    CONF_ID,
-    CONF_NAME,
-    CONF_TOKEN,
-    DOMAIN,
-)
+from . import DATA_CONFIG, DATA_DEVICES
+from .const import CONF_API_URL, CONF_TOKEN, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -36,7 +29,14 @@ async def async_setup_entry(
         _LOGGER.debug("TronbytAssistant configuration missing; skipping light setup.")
         return
 
-    entities = [TronbytLight(device) for device in conf.get(CONF_DEVICE, [])]
+    devices = hass.data.get(DOMAIN, {}).get(DATA_DEVICES, [])
+    if not devices:
+        _LOGGER.debug("No Tronbyt devices available; skipping light entity creation.")
+        return
+
+    api_url = conf[CONF_API_URL]
+    token = conf[CONF_TOKEN]
+    entities = [TronbytLight(device, api_url, token) for device in devices]
     if entities:
         async_add_entities(entities)
 
@@ -47,18 +47,24 @@ class TronbytLight(LightEntity):
     _attr_color_mode = ColorMode.BRIGHTNESS
     _attr_supported_color_modes = {ColorMode.BRIGHTNESS}
 
-    def __init__(self, device: dict[str, Any]) -> None:
-        self._name = device[CONF_NAME]
-        self._deviceid = device[CONF_ID]
-        self._token = device[CONF_TOKEN]
-        self._url = f"{device.get(CONF_API_URL)}/v0/devices/{self._deviceid}"
+    def __init__(self, device: dict[str, Any], api_url: str, token: str) -> None:
+        self._deviceid = device["id"]
+        self._name = device["name"]
+        self._base_url = api_url
+        self._token = token
+        self._url = f"{self._base_url}/v0/devices/{self._deviceid}"
         self._header = {
             "Authorization": f"Bearer {self._token}",
             "Content-Type": "application/json",
             "Accept": "application/json",
         }
-        self._brightness: int | None = None
-        self._is_on = True
+        brightness = device.get("brightness")
+        if brightness is not None:
+            self._brightness = round((brightness * 0.01) * 255)
+            self._is_on = brightness >= BRIGHTNESS_SCALE[0]
+        else:
+            self._brightness = None
+            self._is_on = True
 
     @property
     def name(self) -> str:
@@ -67,6 +73,15 @@ class TronbytLight(LightEntity):
     @property
     def unique_id(self) -> str:
         return f"tronbytlight-{self._deviceid}"
+
+    @property
+    def device_info(self) -> dict[str, Any]:
+        return {
+            "identifiers": {(DOMAIN, self._deviceid)},
+            "name": self._name,
+            "manufacturer": "Tronbyt",
+            "model": "Display",
+        }
 
     @property
     def brightness(self) -> int | None:
@@ -109,6 +124,7 @@ class TronbytLight(LightEntity):
                     _LOGGER.error("%s", error)
                     return
                 data = await response.json()
+                self._name = data.get("displayName", self._name)
                 percent = data.get("brightness", 0)
                 self._is_on = percent >= BRIGHTNESS_SCALE[0]
                 self._brightness = round((percent * 0.01) * 255)

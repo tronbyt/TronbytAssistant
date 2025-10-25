@@ -5,6 +5,7 @@ import os
 import re
 from collections.abc import Mapping
 from typing import Any
+from urllib.parse import urlparse
 
 import aiofiles
 import aiohttp
@@ -21,31 +22,31 @@ from homeassistant.helpers.typing import ConfigType
 
 from .const import (
     DOMAIN,
-    CONF_DEVICE,
-    CONF_TOKEN,
-    CONF_ID,
-    CONF_NAME,
     CONF_API_URL,
+    CONF_TOKEN,
+    ATTR_ARGS,
+    ATTR_COLOR,
     ATTR_CONTENT,
     ATTR_CONTENT_ID,
-    ATTR_DEVICENANME,
     ATTR_CONT_TYPE,
     ATTR_CUSTOM_CONT,
-    ATTR_TEXT_TYPE,
+    ATTR_DEVICENANME,
     ATTR_FONT,
-    ATTR_COLOR,
-    ATTR_TITLE_CONTENT,
-    ATTR_TITLE_COLOR,
-    ATTR_TITLE_FONT,
-    ATTR_ARGS,
-    ATTR_PUBLISH_TYPE,
     ATTR_LANG,
+    ATTR_PUBLISH_TYPE,
+    ATTR_TEXT_TYPE,
+    ATTR_TITLE_COLOR,
+    ATTR_TITLE_CONTENT,
+    ATTR_TITLE_FONT,
 )
 
 _LOGGER = logging.getLogger(__name__)
 
+PLATFORMS: list[Platform] = [Platform.LIGHT, Platform.SWITCH]
+
 DATA_CONFIG = "config"
 DATA_SERVICES_REGISTERED = "services_registered"
+DATA_DEVICES = "devices"
 
 DEFAULT_TITLE = ""
 DEFAULT_TITLE_COLOR = ""
@@ -54,49 +55,17 @@ DEFAULT_ARGS = ""
 DEFAULT_CONTENT_ID = ""
 DEFAULT_LANG = "en"
 
-PLATFORMS: list[Platform] = [Platform.LIGHT, Platform.SWITCH]
-
-DEVICE_SCHEMA = vol.Schema(
-    {
-        vol.Required(CONF_API_URL): cv.string,
-        vol.Optional(CONF_NAME): cv.string,
-        vol.Required(CONF_ID): cv.string,
-        vol.Required(CONF_TOKEN): cv.string,
-    }
-)
-
 CONFIG_SCHEMA = vol.Schema(
     {
         DOMAIN: vol.Schema(
             {
-                vol.Required(CONF_DEVICE): vol.All(cv.ensure_list, [DEVICE_SCHEMA]),
+                vol.Required(CONF_API_URL): cv.string,
+                vol.Required(CONF_TOKEN): cv.string,
             }
         ),
     },
     extra=vol.ALLOW_EXTRA,
 )
-
-
-async def getdevicename(endpoint: str, deviceid: str, token: str) -> str | None:
-    """Retrieve the Tronbyt display name for a device."""
-    url = f"{endpoint}/v0/devices/{deviceid}"
-    header = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-    }
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url, headers=header) as response:
-            if response.status != 200:
-                _LOGGER.warning(
-                    "Unable to retrieve device name from %s for %s (status: %s)",
-                    endpoint,
-                    deviceid,
-                    response.status,
-                )
-                return None
-            data = await response.json()
-    return data.get("displayName")
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
@@ -129,6 +98,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})
 
     conf = _clone_config(entry.data)
+    try:
+        conf[CONF_API_URL] = _normalize_base_url(conf[CONF_API_URL])
+    except ValueError as err:
+        raise HomeAssistantError(
+            "Tronbyt base URL must include the protocol (e.g. https://host)"
+        ) from err
     hass.data[DOMAIN][DATA_CONFIG] = conf
 
     await _async_register_services(hass)
@@ -147,6 +122,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     data = hass.data.get(DOMAIN)
     if data is not None:
         data.pop(DATA_CONFIG, None)
+        data.pop(DATA_DEVICES, None)
         if data.get(DATA_SERVICES_REGISTERED):
             _async_remove_services(hass)
 
@@ -154,34 +130,63 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def _async_prepare_devices(hass: HomeAssistant, conf: dict[str, Any]) -> None:
-    """Derive device names and update the services schema."""
-    devices = conf.get(CONF_DEVICE, [])
+    """Fetch devices from Tronbyt and update services.yaml selectors."""
+    api_url = conf[CONF_API_URL]
+    token = conf[CONF_TOKEN]
+
+    devices = await _async_fetch_devices(api_url, token)
     if not devices:
-        raise HomeAssistantError("At least one Tronbyt device must be configured.")
+        raise HomeAssistantError(
+            "No Tronbyt devices were returned by the server. Verify your API key."
+        )
 
-    devicelist: list[str] = []
-    for device in devices:
-        dev_name = device.get(CONF_NAME)
-        if not dev_name:
-            retrievedname = await getdevicename(
-                device.get(CONF_API_URL),
-                device[CONF_ID],
-                device[CONF_TOKEN],
-            )
-            if retrievedname:
-                dev_name = retrievedname
-            else:
-                dev_name = device[CONF_ID]
-            device[CONF_NAME] = dev_name
-        devicelist.append(dev_name)
+    hass.data[DOMAIN][DATA_DEVICES] = devices
+    await _async_update_services_yaml(hass, [device["name"] for device in devices])
 
-    await _async_update_services_yaml(hass, devicelist)
+
+async def _async_fetch_devices(api_url: str, token: str) -> list[dict[str, Any]]:
+    """Fetch devices available to the provided Tronbyt user token."""
+    endpoint = f"{api_url}/v0/devices"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/json",
+    }
+    async with aiohttp.ClientSession() as session:
+        try:
+            async with session.get(endpoint, headers=headers) as response:
+                if response.status != 200:
+                    error = await response.text()
+                    _LOGGER.error("Failed to fetch devices: %s", error)
+                    raise HomeAssistantError("Failed to fetch devices from Tronbyt.")
+                payload = await response.json()
+        except aiohttp.ClientError as err:
+            raise HomeAssistantError(
+                f"Error connecting to Tronbyt at {endpoint}: {err}"
+            ) from err
+
+    devices: list[dict[str, Any]] = []
+    for item in payload.get("devices", []):
+        device_id = item.get("id")
+        if not device_id:
+            continue
+
+        name = item.get("displayName") or device_id
+        devices.append(
+            {
+                "id": device_id,
+                "name": name,
+                "brightness": item.get("brightness"),
+                "autoDim": item.get("autoDim"),
+            }
+        )
+
+    return devices
 
 
 async def _async_update_services_yaml(
-    hass: HomeAssistant, devicelist: list[str]
+    hass: HomeAssistant, devicenames: list[str]
 ) -> None:
-    """Patch services.yaml to reflect the configured device names."""
+    """Update services.yaml selectors based on current configuration."""
     config_dir = hass.config.path()
     yaml_path = os.path.join(
         config_dir,
@@ -199,7 +204,7 @@ async def _async_update_services_yaml(
         ) from exc
 
     services_config = yaml.safe_load(content) or {}
-    device_name_options = [{"label": name, "value": name} for name in devicelist]
+    device_name_options = [{"label": name, "value": name} for name in devicenames]
 
     for service in services_config.values():
         fields = service.get("fields")
@@ -227,8 +232,16 @@ async def _async_register_services(hass: HomeAssistant) -> None:
     def _get_config() -> dict[str, Any]:
         conf = hass.data.get(DOMAIN, {}).get(DATA_CONFIG)
         if not conf:
-            raise HomeAssistantError("TidbytAssistant configuration is not available.")
+            raise HomeAssistantError("TronbytAssistant configuration is not available.")
         return conf
+
+    def _get_device_lookup() -> dict[str, dict[str, Any]]:
+        devices = hass.data.get(DOMAIN, {}).get(DATA_DEVICES)
+        if not devices:
+            raise HomeAssistantError(
+                "No Tronbyt devices are loaded. Reload the integration."
+            )
+        return {device["name"]: device for device in devices}
 
     def validateid(input_value: str) -> bool:
         """Check if the string contains only A-Z, a-z, and 0-9."""
@@ -281,6 +294,10 @@ async def _async_register_services(hass: HomeAssistant) -> None:
 
     async def handle_push_or_text(call: ServiceCall, is_text: bool) -> None:
         conf = _get_config()
+        device_lookup = _get_device_lookup()
+
+        base_url = conf[CONF_API_URL]
+        token = conf[CONF_TOKEN]
 
         contentid = call.data.get(ATTR_CONTENT_ID, DEFAULT_CONTENT_ID)
         publishtype = call.data.get(ATTR_PUBLISH_TYPE)
@@ -324,21 +341,20 @@ async def _async_register_services(hass: HomeAssistant) -> None:
                     raise HomeAssistantError(f"Unsupported content type: {contenttype}")
 
         for device in devicename:
-            for item in conf[CONF_DEVICE]:
-                if item[CONF_NAME] != device:
-                    continue
+            info = device_lookup.get(device)
+            if info is None:
+                raise HomeAssistantError(f"{device} is not a known Tronbyt device.")
 
-                token = item[CONF_TOKEN]
-                deviceid = item[CONF_ID]
-                api_url = f"{item.get(CONF_API_URL)}/v0/devices/{deviceid}/push_app"
-                body = {
-                    "config": arguments,
-                    "app_id": content,
-                    "installationID": contentid,
-                }
-                if publishtype:
-                    body["publish"] = publishtype
-                await request("POST", api_url, body, headers=tronbyt_headers(token))
+            deviceid = info["id"]
+            api_url = f"{base_url}/v0/devices/{deviceid}/push_app"
+            body = {
+                "config": arguments,
+                "app_id": content,
+                "installationID": contentid,
+            }
+            if publishtype:
+                body["publish"] = publishtype
+            await request("POST", api_url, body, headers=tronbyt_headers(token))
 
     async def pixlet_push(call: ServiceCall) -> None:
         await handle_push_or_text(call, is_text=False)
@@ -348,6 +364,7 @@ async def _async_register_services(hass: HomeAssistant) -> None:
 
     async def pixlet_delete(call: ServiceCall) -> None:
         conf = _get_config()
+        device_lookup = _get_device_lookup()
 
         contentid = call.data.get(ATTR_CONTENT_ID)
         if not validateid(contentid):
@@ -356,34 +373,35 @@ async def _async_register_services(hass: HomeAssistant) -> None:
                 "Content ID must contain characters A-Z, a-z or 0-9"
             )
 
+        base_url = conf[CONF_API_URL]
+        token = conf[CONF_TOKEN]
         devicename = call.data.get(ATTR_DEVICENANME)
         for device in devicename:
-            for item in conf[CONF_DEVICE]:
-                if item[CONF_NAME] != device:
-                    continue
+            info = device_lookup.get(device)
+            if info is None:
+                raise HomeAssistantError(f"{device} is not a known Tronbyt device.")
 
-                token = item[CONF_TOKEN]
-                deviceid = item[CONF_ID]
-                base_url = item.get(CONF_API_URL)
+            deviceid = info["id"]
 
-                validids = await getinstalledapps(base_url, deviceid, token)
-                if contentid not in validids:
-                    _LOGGER.error(
-                        "The Content ID you entered is not an installed app on %s. Currently installed apps are: %s",
-                        device,
-                        validids,
-                    )
-                    raise HomeAssistantError(
-                        f"The Content ID you entered is not an installed app on {device}. Currently installed apps are: {validids}"
-                    )
+            validids = await getinstalledapps(base_url, deviceid, token)
+            if contentid not in validids:
+                _LOGGER.error(
+                    "The Content ID you entered is not an installed app on %s. Currently installed apps are: %s",
+                    device,
+                    validids,
+                )
+                raise HomeAssistantError(
+                    f"The Content ID you entered is not an installed app on {device}. Currently installed apps are: {validids}"
+                )
 
-                url = f"{base_url}/v0/devices/{deviceid}/installations/{contentid}"
-                await request("DELETE", url, {}, headers=tronbyt_headers(token))
+            url = f"{base_url}/v0/devices/{deviceid}/installations/{contentid}"
+            await request("DELETE", url, {}, headers=tronbyt_headers(token))
 
     async def handle_installation_update(
         call: ServiceCall, payload: dict[str, Any]
     ) -> None:
         conf = _get_config()
+        device_lookup = _get_device_lookup()
 
         contentid = call.data.get(ATTR_CONTENT_ID)
         if not validateid(contentid):
@@ -392,33 +410,31 @@ async def _async_register_services(hass: HomeAssistant) -> None:
                 "Content ID must contain characters A-Z, a-z or 0-9"
             )
 
+        base_url = conf[CONF_API_URL]
+        token = conf[CONF_TOKEN]
         devicename = call.data.get(ATTR_DEVICENANME)
         for device in devicename:
-            for item in conf[CONF_DEVICE]:
-                if item[CONF_NAME] != device:
-                    continue
+            info = device_lookup.get(device)
+            if info is None:
+                raise HomeAssistantError(f"{device} is not a known Tronbyt device.")
 
-                token = item[CONF_TOKEN]
-                deviceid = item[CONF_ID]
-                base_url = item.get(CONF_API_URL)
+            deviceid = info["id"]
 
-                validids = await getinstalledapps(
-                    base_url, deviceid, token, only_pushed=False
+            validids = await getinstalledapps(
+                base_url, deviceid, token, only_pushed=False
+            )
+            if contentid not in validids:
+                _LOGGER.error(
+                    "The Content ID you entered is not an installed app on %s. Currently installed apps are: %s",
+                    device,
+                    validids,
                 )
-                if contentid not in validids:
-                    _LOGGER.error(
-                        "The Content ID you entered is not an installed app on %s. Currently installed apps are: %s",
-                        device,
-                        validids,
-                    )
-                    raise HomeAssistantError(
-                        f"The Content ID you entered is not an installed app on {device}. Currently installed apps are: {validids}"
-                    )
-
-                endpoint = f"{base_url}/v0/devices/{deviceid}/installations/{contentid}"
-                await request(
-                    "PATCH", endpoint, payload, headers=tronbyt_headers(token)
+                raise HomeAssistantError(
+                    f"The Content ID you entered is not an installed app on {device}. Currently installed apps are: {validids}"
                 )
+
+            endpoint = f"{base_url}/v0/devices/{deviceid}/installations/{contentid}"
+            await request("PATCH", endpoint, payload, headers=tronbyt_headers(token))
 
     async def pixlet_enable(call: ServiceCall) -> None:
         await handle_installation_update(call, {"set_enabled": True})
@@ -456,6 +472,19 @@ def _async_remove_services(hass: HomeAssistant) -> None:
     ):
         hass.services.async_remove(DOMAIN, service)
     hass.data.setdefault(DOMAIN, {})[DATA_SERVICES_REGISTERED] = False
+
+
+def _normalize_base_url(url: str) -> str:
+    if not url:
+        raise ValueError
+    parsed = urlparse(url)
+    if not parsed.scheme or not parsed.netloc:
+        raise ValueError
+    path = parsed.path.rstrip("/")
+    normalized = f"{parsed.scheme}://{parsed.netloc}"
+    if path:
+        normalized += path
+    return normalized
 
 
 def _clone_config(value: Any) -> Any:
