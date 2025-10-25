@@ -28,19 +28,19 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up Tronbyt auto-dim switches from a config entry."""
+    """Set up Tronbyt night mode switches from a config entry."""
     conf = hass.data.get(DOMAIN, {}).get(DATA_CONFIG)
     if not conf:
         _LOGGER.debug("TronbytAssistant configuration missing; skipping switch setup.")
         return
 
-    entities = [TronbytAutoDimSwitch(device) for device in conf.get(CONF_DEVICE, [])]
+    entities = [TronbytNightModeSwitch(device) for device in conf.get(CONF_DEVICE, [])]
     if entities:
         async_add_entities(entities)
 
 
-class TronbytAutoDimSwitch(SwitchEntity):
-    """Expose the Tronbyt auto-dim flag as a switch."""
+class TronbytNightModeSwitch(SwitchEntity):
+    """Expose the Tronbyt night mode flag as a switch."""
 
     def __init__(self, device: dict[str, Any]) -> None:
         self._name = device[CONF_NAME]
@@ -56,11 +56,11 @@ class TronbytAutoDimSwitch(SwitchEntity):
 
     @property
     def name(self) -> str:
-        return f"{self._name} AutoDim"
+        return f"{self._name} Night Mode"
 
     @property
     def unique_id(self) -> str:
-        return f"tronbytautodim-{self._deviceid}"
+        return f"tronbytnightmode-{self._deviceid}"
 
     @property
     def icon(self) -> str:
@@ -71,10 +71,10 @@ class TronbytAutoDimSwitch(SwitchEntity):
         return self._is_on
 
     async def async_turn_on(self, **kwargs: Any) -> None:
-        await self._async_set_autodim(True)
+        await self._async_set_night_mode(True)
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        await self._async_set_autodim(False)
+        await self._async_set_night_mode(False)
 
     async def async_update(self) -> None:
         async with aiohttp.ClientSession() as session:
@@ -86,7 +86,7 @@ class TronbytAutoDimSwitch(SwitchEntity):
                 data = await response.json()
                 self._is_on = data.get("autoDim")
 
-    async def _async_set_autodim(self, enabled: bool) -> None:
+    async def _async_set_night_mode(self, enabled: bool) -> None:
         payload = {"autoDim": enabled}
         async with aiohttp.ClientSession() as session:
             async with session.patch(

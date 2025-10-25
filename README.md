@@ -28,7 +28,7 @@ Copy the entirety of `custom_components/tronbytassistant` to your `/config/custo
 
 ## Entities
 - Each Tronbyt device exposes a light entity that controls display brightness (0–100%).
-- Auto-dimming is available as a switch entity so you can toggle adaptive brightness in automations.
+- Night mode is available as a switch entity so you can toggle adaptive brightness in automations.
 
 ## Services
 ### TronbytAssistant: Push
