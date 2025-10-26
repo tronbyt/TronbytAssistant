@@ -1,17 +1,16 @@
 from __future__ import annotations
 
-import asyncio
 import logging
-from typing import Any
+from typing import Any, Optional
 
-import aiohttp
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from . import DATA_CONFIG, DATA_DEVICES
-from .const import CONF_API_URL, CONF_TOKEN, DOMAIN
+from .const import DATA_COORDINATOR, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -21,64 +20,71 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up Tronbyt night mode switches from a config entry."""
-    conf = hass.data.get(DOMAIN, {}).get(DATA_CONFIG)
-    if not conf:
-        _LOGGER.debug("TronbytAssistant configuration missing; skipping switch setup.")
+    """Set up Tronbyt auto-dim switches from a config entry."""
+    coordinator = hass.data.get(DOMAIN, {}).get(DATA_COORDINATOR)
+    if coordinator is None or not coordinator.data:
+        _LOGGER.debug("No Tronbyt devices available; skipping switch setup.")
         return
 
-    devices = hass.data.get(DOMAIN, {}).get(DATA_DEVICES, [])
-    if not devices:
-        _LOGGER.debug("No Tronbyt devices available; skipping switch entity creation.")
-        return
-
-    api_url = conf[CONF_API_URL]
-    token = conf[CONF_TOKEN]
-    entities = [TronbytAutoDimSwitch(device, api_url, token) for device in devices]
+    entities = [
+        TronbytAutoDimSwitch(coordinator, device["id"])
+        for device in coordinator.data
+        if device.get("id")
+    ]
     if entities:
         async_add_entities(entities)
 
 
-class TronbytAutoDimSwitch(SwitchEntity):
+class TronbytAutoDimSwitch(CoordinatorEntity, SwitchEntity):
     """Expose the Tronbyt auto-dim flag as a switch."""
 
-    def __init__(self, device: dict[str, Any], api_url: str, token: str) -> None:
-        self._deviceid = device["id"]
-        self._name = device["name"]
-        self._base_url = api_url
-        self._token = token
-        self._url = f"{self._base_url}/v0/devices/{self._deviceid}"
-        self._header = {
-            "Authorization": f"Bearer {self._token}",
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-        }
-        self._is_on: bool | None = device.get("autoDim")
+    _attr_has_entity_name = True
+
+    def __init__(self, coordinator, device_id: str) -> None:
+        super().__init__(coordinator)
+        self._deviceid = device_id
+        self._attr_unique_id = f"tronbytautodim-{device_id}"
+
+    @property
+    def _device(self) -> Optional[dict[str, Any]]:
+        if not self.coordinator.data:
+            return None
+        for device in self.coordinator.data:
+            if device.get("id") == self._deviceid:
+                return device
+        return None
 
     @property
     def name(self) -> str:
-        return f"{self._name} AutoDim"
+        device = self._device
+        display_name = device.get("name") if device else self._deviceid
+        return f"{display_name} AutoDim"
 
     @property
-    def unique_id(self) -> str:
-        return f"tronbytautodim-{self._deviceid}"
+    def is_on(self) -> bool | None:
+        device = self._device
+        if not device:
+            return None
+        return device.get("autoDim")
 
     @property
-    def device_info(self) -> dict[str, Any]:
-        return {
-            "identifiers": {(DOMAIN, self._deviceid)},
-            "name": self._name,
-            "manufacturer": "Tronbyt",
-            "model": "Display",
-        }
+    def available(self) -> bool:
+        return self._device is not None
 
     @property
     def icon(self) -> str:
         return "mdi:brightness-auto"
 
     @property
-    def is_on(self) -> bool | None:
-        return self._is_on
+    def device_info(self) -> dict[str, Any]:
+        device = self._device or {}
+        name = device.get("name", self._deviceid)
+        return {
+            "identifiers": {(DOMAIN, self._deviceid)},
+            "name": name,
+            "manufacturer": "Tronbyt",
+            "model": "Display",
+        }
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         await self._async_set_autodim(True)
@@ -86,28 +92,19 @@ class TronbytAutoDimSwitch(SwitchEntity):
     async def async_turn_off(self, **kwargs: Any) -> None:
         await self._async_set_autodim(False)
 
-    async def async_update(self) -> None:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(self._url, headers=self._header) as response:
-                if response.status != 200:
-                    error = await response.text()
-                    _LOGGER.error("%s", error)
-                    return
-                data = await response.json()
-                self._name = data.get("displayName", self._name)
-                self._is_on = data.get("autoDim")
-
     async def _async_set_autodim(self, enabled: bool) -> None:
+        session = async_get_clientsession(self.hass)
+        url = f"{self.coordinator.base_url}/v0/devices/{self._deviceid}"
+        headers = {
+            "Authorization": f"Bearer {self.coordinator.token}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
         payload = {"autoDim": enabled}
-        async with aiohttp.ClientSession() as session:
-            async with session.patch(
-                self._url, headers=self._header, json=payload
-            ) as response:
-                if response.status != 200:
-                    error = await response.text()
-                    _LOGGER.error("%s", error)
+        async with session.patch(url, headers=headers, json=payload) as response:
+            if response.status != 200:
+                error = await response.text()
+                _LOGGER.error("Failed to set autoDim on %s: %s", self._deviceid, error)
+                return
 
-    async def async_poll_device(self) -> None:
-        while True:
-            await self.async_update()
-            await asyncio.sleep(30)
+        await self.coordinator.async_request_refresh()
