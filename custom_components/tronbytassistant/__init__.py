@@ -22,6 +22,7 @@ import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.helpers import device_registry as dr
 
 from .const import (
     ATTR_ARGS,
@@ -31,6 +32,7 @@ from .const import (
     ATTR_CONT_TYPE,
     ATTR_CUSTOM_CONT,
     ATTR_DEVICENANME,
+    ATTR_DEVICE_IDS,
     ATTR_FONT,
     ATTR_LANG,
     ATTR_PUBLISH_TYPE,
@@ -192,14 +194,67 @@ async def _async_register_services(
         return
 
     session = async_get_clientsession(hass)
+    device_reg = dr.async_get(hass)
 
-    def _device_lookup() -> dict[str, dict[str, Any]]:
+    def _get_device_maps() -> tuple[
+        dict[str, dict[str, Any]], dict[str, dict[str, Any]]
+    ]:
         devices = coordinator.data or []
         if not devices:
             raise HomeAssistantError(
                 "No Tronbyt devices are loaded. Reload the integration."
             )
-        return {device["name"]: device for device in devices}
+        return (
+            {device["name"]: device for device in devices},
+            {device["id"]: device for device in devices},
+        )
+
+    def _resolve_devices(call: ServiceCall) -> list[dict[str, Any]]:
+        names_map, ids_map = _get_device_maps()
+        resolved: list[dict[str, Any]] = []
+        seen: set[str] = set()
+
+        raw_ids = call.data.get(ATTR_DEVICE_IDS)
+        if raw_ids:
+            ids = raw_ids if isinstance(raw_ids, list) else [raw_ids]
+            for device_id in ids:
+                entry = device_reg.async_get(device_id)
+                if entry is None:
+                    raise HomeAssistantError(
+                        f"Device {device_id} is not registered in Home Assistant."
+                    )
+                matched_id = None
+                for domain, identifier in entry.identifiers:
+                    if domain == DOMAIN:
+                        matched_id = identifier
+                        break
+                if matched_id is None:
+                    raise HomeAssistantError(
+                        f"Device {device_id} is not managed by TronbytAssistant."
+                    )
+                device = ids_map.get(matched_id)
+                if device is None:
+                    raise HomeAssistantError(
+                        f"Tronbyt device with id {matched_id} is not available."
+                    )
+                if matched_id not in seen:
+                    resolved.append(device)
+                    seen.add(matched_id)
+
+        raw_names = call.data.get(ATTR_DEVICENANME)
+        if raw_names:
+            names = raw_names if isinstance(raw_names, list) else [raw_names]
+            for name in names:
+                device = names_map.get(name)
+                if device is None:
+                    raise HomeAssistantError(f"{name} is not a known Tronbyt device.")
+                if device["id"] not in seen:
+                    resolved.append(device)
+                    seen.add(device["id"])
+
+        if not resolved:
+            raise HomeAssistantError("You must select at least one Tronbyt device.")
+        return resolved
 
     def validateid(input_value: str) -> bool:
         """Check if the string contains only A-Z, a-z, and 0-9."""
@@ -249,11 +304,7 @@ async def _async_register_services(
     async def handle_push_or_text(call: ServiceCall, is_text: bool) -> None:
         contentid = call.data.get(ATTR_CONTENT_ID, DEFAULT_CONTENT_ID)
         publishtype = call.data.get(ATTR_PUBLISH_TYPE)
-        devicename = call.data.get(ATTR_DEVICENANME)
-        if not devicename:
-            raise HomeAssistantError("You must select at least one device.")
-
-        device_lookup = _device_lookup()
+        targets = _resolve_devices(call)
 
         arguments: dict[str, Any] = {}
         if is_text:
@@ -293,11 +344,7 @@ async def _async_register_services(
                     raise HomeAssistantError(f"Unsupported content type: {contenttype}")
 
         refresh_needed = False
-        for device in devicename:
-            item = device_lookup.get(device)
-            if item is None:
-                raise HomeAssistantError(f"{device} is not a known Tronbyt device.")
-
+        for item in targets:
             deviceid = item["id"]
             api_url = f"{coordinator.base_url}/v0/devices/{deviceid}/push_app"
             body = {
@@ -327,26 +374,20 @@ async def _async_register_services(
                 "Content ID must contain characters A-Z, a-z or 0-9"
             )
 
-        devicename = call.data.get(ATTR_DEVICENANME)
-        device_lookup = _device_lookup()
-
+        targets = _resolve_devices(call)
         refresh_needed = False
-        for device in devicename:
-            item = device_lookup.get(device)
-            if item is None:
-                raise HomeAssistantError(f"{device} is not a known Tronbyt device.")
-
+        for item in targets:
             deviceid = item["id"]
 
             validids = await getinstalledapps(deviceid)
             if contentid not in validids:
                 _LOGGER.error(
                     "The Content ID you entered is not an installed app on %s. Currently installed apps are: %s",
-                    device,
+                    item["name"],
                     validids,
                 )
                 raise HomeAssistantError(
-                    f"The Content ID you entered is not an installed app on {device}. Currently installed apps are: {validids}"
+                    f"The Content ID you entered is not an installed app on {item['name']}. Currently installed apps are: {validids}"
                 )
 
             url = f"{coordinator.base_url}/v0/devices/{deviceid}/installations/{contentid}"
@@ -366,26 +407,20 @@ async def _async_register_services(
                 "Content ID must contain characters A-Z, a-z or 0-9"
             )
 
-        devicename = call.data.get(ATTR_DEVICENANME)
-        device_lookup = _device_lookup()
-
+        targets = _resolve_devices(call)
         refresh_needed = False
-        for device in devicename:
-            item = device_lookup.get(device)
-            if item is None:
-                raise HomeAssistantError(f"{device} is not a known Tronbyt device.")
-
+        for item in targets:
             deviceid = item["id"]
 
             validids = await getinstalledapps(deviceid, only_pushed=False)
             if contentid not in validids:
                 _LOGGER.error(
                     "The Content ID you entered is not an installed app on %s. Currently installed apps are: %s",
-                    device,
+                    item["name"],
                     validids,
                 )
                 raise HomeAssistantError(
-                    f"The Content ID you entered is not an installed app on {device}. Currently installed apps are: {validids}"
+                    f"The Content ID you entered is not an installed app on {item['name']}. Currently installed apps are: {validids}"
                 )
 
             endpoint = f"{coordinator.base_url}/v0/devices/{deviceid}/installations/{contentid}"
