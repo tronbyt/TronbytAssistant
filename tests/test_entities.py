@@ -7,15 +7,13 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-pytest.importorskip("homeassistant")
-
-from custom_components.tronbytassistant.const import DOMAIN
 from custom_components.tronbytassistant import light as light_mod
 from custom_components.tronbytassistant import number as number_mod
 from custom_components.tronbytassistant import select as select_mod
 from custom_components.tronbytassistant import switch as switch_mod
 from custom_components.tronbytassistant import time as time_mod
 from custom_components.tronbytassistant.__init__ import TronbytCoordinator
+from custom_components.tronbytassistant.const import DOMAIN
 
 
 @pytest.fixture

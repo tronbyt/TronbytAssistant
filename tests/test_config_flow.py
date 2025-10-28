@@ -4,8 +4,6 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-pytest.importorskip("homeassistant")
-
 from homeassistant.config_entries import SOURCE_IMPORT, SOURCE_USER
 from homeassistant.data_entry_flow import FlowResultType
 

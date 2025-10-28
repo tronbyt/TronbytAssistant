@@ -6,8 +6,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-pytest.importorskip("homeassistant")
-
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.update_coordinator import UpdateFailed
