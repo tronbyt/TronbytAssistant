@@ -391,17 +391,9 @@ async def _async_register_services(
         if refresh_needed:
             await coordinator.async_request_refresh()
 
-    async def pixlet_enable(call: ServiceCall) -> None:
-        await handle_installation_update(call, {"set_enabled": True})
-
-    async def pixlet_disable(call: ServiceCall) -> None:
-        await handle_installation_update(call, {"set_enabled": False})
-
     hass.services.async_register(DOMAIN, "push", pixlet_push)
     hass.services.async_register(DOMAIN, "text", pixlet_text)
     hass.services.async_register(DOMAIN, "delete", pixlet_delete)
-    hass.services.async_register(DOMAIN, "enable_app", pixlet_enable)
-    hass.services.async_register(DOMAIN, "disable_app", pixlet_disable)
 
     data[DATA_SERVICES_REGISTERED] = True
 
@@ -412,8 +404,6 @@ def _async_remove_services(hass: HomeAssistant) -> None:
         "push",
         "text",
         "delete",
-        "enable_app",
-        "disable_app",
     ):
         hass.services.async_remove(DOMAIN, service)
     hass.data.setdefault(DOMAIN, {})[DATA_SERVICES_REGISTERED] = False
