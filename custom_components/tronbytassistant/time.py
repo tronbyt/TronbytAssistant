@@ -17,34 +17,33 @@ from .const import DATA_COORDINATOR, DOMAIN
 @dataclass(frozen=True)
 class TronbytTimeDescription:
     key: str
-    name: str
+    translation_key: str | None
     icon: str | None
     value_fn: Callable[[dict[str, Any]], str | None]
     patch_key: str
     entity_registry_enabled_default: bool = True
     entity_registry_visible_default: bool = True
-    translation_key: str | None = None
     entity_category: EntityCategory | None = EntityCategory.CONFIG
 
 
 TIME_DESCRIPTIONS: tuple[TronbytTimeDescription, ...] = (
     TronbytTimeDescription(
         key="night_mode_start",
-        name="Night Mode Start",
+        translation_key="night_mode_start",
         icon="mdi:weather-night",
         value_fn=lambda device: (device.get("night_mode") or {}).get("start"),
         patch_key="nightModeStartTime",
     ),
     TronbytTimeDescription(
         key="night_mode_end",
-        name="Night Mode End",
+        translation_key="night_mode_end",
         icon="mdi:weather-sunset-up",
         value_fn=lambda device: (device.get("night_mode") or {}).get("end"),
         patch_key="nightModeEndTime",
     ),
     TronbytTimeDescription(
         key="dim_mode_start",
-        name="Dim Mode Start",
+        translation_key="dim_mode_start",
         icon="mdi:weather-sunset-down",
         value_fn=lambda device: (device.get("dim_mode") or {}).get("start"),
         patch_key="dimModeStartTime",
@@ -90,7 +89,6 @@ class TronbytTime(CoordinatorEntity, TimeEntity):
         self._deviceid = device_id
         self._attr_unique_id = f"tronbyt-{description.key}-{device_id}"
         self._attr_icon = description.icon
-        self._attr_name = description.name
         self._attr_entity_registry_enabled_default = (
             description.entity_registry_enabled_default
         )
@@ -159,7 +157,3 @@ class TronbytTime(CoordinatorEntity, TimeEntity):
             self._deviceid,
             {self._description.patch_key: payload_value},
         )
-
-    @property
-    def name(self) -> str:
-        return self._description.name

@@ -8,5 +8,56 @@
         }
       }
     }
+  },
+  "entity": {
+    "light": {
+      "brightness": {
+        "name": "Brightness"
+      },
+      "night_mode_brightness": {
+        "name": "Night Mode Brightness"
+      },
+      "dim_mode_brightness": {
+        "name": "Dim Mode Brightness"
+      }
+    },
+    "number": {
+      "update_interval": {
+        "name": "Update Interval"
+      }
+    },
+    "time": {
+      "night_mode_start": {
+        "name": "Night Mode Start"
+      },
+      "night_mode_end": {
+        "name": "Night Mode End"
+      },
+      "dim_mode_start": {
+        "name": "Dim Mode Start"
+      }
+    },
+    "select": {
+      "night_mode_app": {
+        "name": "Night Mode App",
+        "state": {
+          "none": "None"
+        }
+      },
+      "pinned_app": {
+        "name": "Pinned App",
+        "state": {
+          "none": "None"
+        }
+      }
+    },
+    "switch": {
+      "night_mode_switch": {
+        "name": "Night Mode"
+      },
+      "installation_switch": {
+        "name": "Enable {label}"
+      }
+    }
   }
 }

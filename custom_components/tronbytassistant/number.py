@@ -16,7 +16,7 @@ from .const import DATA_COORDINATOR, DOMAIN
 @dataclass(frozen=True)
 class TronbytNumberDescription:
     key: str
-    name: str
+    translation_key: str | None
     icon: str | None
     min_value: float
     max_value: float
@@ -25,7 +25,6 @@ class TronbytNumberDescription:
     patch_key: str
     unit: str | None = None
     device_class: str | None = None
-    translation_key: str | None = None
     entity_registry_enabled_default: bool = True
     entity_registry_visible_default: bool = True
     entity_category: EntityCategory | None = None
@@ -34,7 +33,7 @@ class TronbytNumberDescription:
 NUMBER_DESCRIPTIONS: tuple[TronbytNumberDescription, ...] = (
     TronbytNumberDescription(
         key="interval",
-        name="Update Interval",
+        translation_key="update_interval",
         icon="mdi:timer-sand",
         min_value=1,
         max_value=3600,
@@ -42,7 +41,6 @@ NUMBER_DESCRIPTIONS: tuple[TronbytNumberDescription, ...] = (
         value_fn=lambda device: device.get("interval"),
         patch_key="intervalSec",
         unit="s",
-        translation_key="update_interval",
         entity_category=EntityCategory.CONFIG,
     ),
 )
@@ -91,7 +89,6 @@ class TronbytNumber(CoordinatorEntity, NumberEntity):
         self._attr_native_step = description.step
         self._attr_native_unit_of_measurement = description.unit
         self._attr_device_class = description.device_class
-        self._attr_name = description.name
         self._attr_translation_key = description.translation_key
         self._attr_entity_registry_enabled_default = (
             description.entity_registry_enabled_default
@@ -130,10 +127,6 @@ class TronbytNumber(CoordinatorEntity, NumberEntity):
             "manufacturer": "Tronbyt",
             "model": model,
         }
-
-    @property
-    def name(self) -> str:
-        return self._description.name
 
     async def async_set_native_value(self, value: float) -> None:
         value = max(

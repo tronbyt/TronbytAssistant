@@ -8,5 +8,56 @@
         }
       }
     }
+  },
+  "entity": {
+    "light": {
+      "brightness": {
+        "name": "Helligkeit"
+      },
+      "night_mode_brightness": {
+        "name": "Nachtmodus-Helligkeit"
+      },
+      "dim_mode_brightness": {
+        "name": "Dimmmodus-Helligkeit"
+      }
+    },
+    "number": {
+      "update_interval": {
+        "name": "Aktualisierungsintervall"
+      }
+    },
+    "time": {
+      "night_mode_start": {
+        "name": "Nachtmodus-Beginn"
+      },
+      "night_mode_end": {
+        "name": "Nachtmodus-Ende"
+      },
+      "dim_mode_start": {
+        "name": "Dimmmodus-Beginn"
+      }
+    },
+    "select": {
+      "night_mode_app": {
+        "name": "Nachtmodus-App",
+        "state": {
+          "none": "Keine"
+        }
+      },
+      "pinned_app": {
+        "name": "Angeheftete App",
+        "state": {
+          "none": "Keine"
+        }
+      }
+    },
+    "switch": {
+      "night_mode_switch": {
+        "name": "Nachtmodus"
+      },
+      "installation_switch": {
+        "name": "Aktiviere {label}"
+      }
+    }
   }
 }
