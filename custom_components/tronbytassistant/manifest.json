@@ -7,5 +7,5 @@
   "config_flow": true,
   "loggers": ["custom_components.tronbytassistant"],
   "single_config_entry": true,
-  "version": "2025.6.1"
+  "version": "0.0.1"
 }
