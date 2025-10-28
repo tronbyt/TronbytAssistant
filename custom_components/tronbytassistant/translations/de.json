@@ -1,0 +1,12 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "data": {
+          "apiurl": "API-URL",
+          "token": "Benutzer-Token"
+        }
+      }
+    }
+  }
+}
