@@ -2,17 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 import re
 from collections.abc import Mapping
 from datetime import timedelta
 from typing import Any
 from urllib.parse import urlparse
 
-import aiofiles
 import aiohttp
 import voluptuous as vol
-import yaml
 
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigEntry
@@ -127,9 +124,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data[DOMAIN][DATA_CONFIG] = conf
     hass.data[DOMAIN][DATA_COORDINATOR] = coordinator
 
-    await _async_update_services_yaml(
-        hass, [device["name"] for device in coordinator.data]
-    )
     await _async_register_services(hass, coordinator)
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -150,46 +144,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             _async_remove_services(hass)
 
     return True
-
-
-async def _async_update_services_yaml(
-    hass: HomeAssistant, devicenames: list[str]
-) -> None:
-    """Update services.yaml selectors based on current configuration."""
-    config_dir = hass.config.path()
-    yaml_path = os.path.join(
-        config_dir,
-        "custom_components",
-        DOMAIN,
-        "services.yaml",
-    )
-
-    try:
-        async with aiofiles.open(yaml_path) as file:
-            content = await file.read()
-    except FileNotFoundError as exc:
-        raise HomeAssistantError(
-            f"services.yaml not found for {DOMAIN} integration."
-        ) from exc
-
-    services_config = yaml.safe_load(content) or {}
-    device_name_options = [{"label": name, "value": name} for name in devicenames]
-
-    for service in services_config.values():
-        fields = service.get("fields")
-        if not fields:
-            continue
-        devicename_field = fields.get(ATTR_DEVICENANME)
-        if not devicename_field:
-            continue
-        selector = devicename_field.get("selector", {}).get("select")
-        if selector is not None:
-            selector["options"] = device_name_options
-
-    async with aiofiles.open(yaml_path, "w") as file:
-        await file.write(
-            yaml.dump(services_config, default_flow_style=False, sort_keys=False)
-        )
 
 
 async def _async_register_services(
@@ -443,19 +397,11 @@ async def _async_register_services(
     async def pixlet_disable(call: ServiceCall) -> None:
         await handle_installation_update(call, {"set_enabled": False})
 
-    async def pixlet_pin(call: ServiceCall) -> None:
-        await handle_installation_update(call, {"set_pinned": True})
-
-    async def pixlet_unpin(call: ServiceCall) -> None:
-        await handle_installation_update(call, {"set_pinned": False})
-
     hass.services.async_register(DOMAIN, "push", pixlet_push)
     hass.services.async_register(DOMAIN, "text", pixlet_text)
     hass.services.async_register(DOMAIN, "delete", pixlet_delete)
     hass.services.async_register(DOMAIN, "enable_app", pixlet_enable)
     hass.services.async_register(DOMAIN, "disable_app", pixlet_disable)
-    hass.services.async_register(DOMAIN, "pin_app", pixlet_pin)
-    hass.services.async_register(DOMAIN, "unpin_app", pixlet_unpin)
 
     data[DATA_SERVICES_REGISTERED] = True
 
@@ -468,8 +414,6 @@ def _async_remove_services(hass: HomeAssistant) -> None:
         "delete",
         "enable_app",
         "disable_app",
-        "pin_app",
-        "unpin_app",
     ):
         hass.services.async_remove(DOMAIN, service)
     hass.data.setdefault(DOMAIN, {})[DATA_SERVICES_REGISTERED] = False
