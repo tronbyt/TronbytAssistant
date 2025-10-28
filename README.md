@@ -1,7 +1,4 @@
-<p align="center">
-  <img src="https://raw.githubusercontent.com/gabe565/TronbytAssistant/main/logo.png">
-</p>
-</br>
+# TronbytAssistant
 
 Display notifications from Home Assistant to Tronbyt devices using this integration.
 
