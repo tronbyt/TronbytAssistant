@@ -1,20 +1,75 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from typing import Any, Optional
 
 from homeassistant.components.light import ATTR_BRIGHTNESS, ColorMode, LightEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.helpers.entity import EntityCategory
 
 from .const import DATA_COORDINATOR, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
-BRIGHTNESS_SCALE = (1, 100)
+BRIGHTNESS_MAX = 255
+BRIGHTNESS_MIN = 0
+BRIGHTNESS_API_MAX = 100
+
+
+def _value_from_device(device: dict[str, Any], path: list[str]) -> Optional[int]:
+    current: Any = device
+    for key in path:
+        if current is None:
+            return None
+        current = current.get(key)
+    if current is None:
+        return None
+    try:
+        return int(current)
+    except (TypeError, ValueError):
+        return None
+
+
+@dataclass(frozen=True)
+class TronbytLightDescription:
+    key: str
+    name: str
+    icon: str | None
+    value_path: list[str]
+    patch_key: str
+    default_on: int = BRIGHTNESS_MAX
+    entity_category: EntityCategory | None = EntityCategory.CONFIG
+
+
+LIGHT_DESCRIPTIONS: tuple[TronbytLightDescription, ...] = (
+    TronbytLightDescription(
+        key="brightness",
+        name="Brightness",
+        icon="mdi:television-ambient-light",
+        value_path=["brightness"],
+        patch_key="brightness",
+    ),
+    TronbytLightDescription(
+        key="night_mode_brightness",
+        name="Night Mode Brightness",
+        icon="mdi:brightness-6",
+        value_path=["night_mode", "brightness"],
+        patch_key="nightModeBrightness",
+        default_on=128,
+    ),
+    TronbytLightDescription(
+        key="dim_mode_brightness",
+        name="Dim Mode Brightness",
+        icon="mdi:brightness-4",
+        value_path=["dim_mode", "brightness"],
+        patch_key="dimModeBrightness",
+        default_on=128,
+    ),
+)
 
 
 async def async_setup_entry(
@@ -22,115 +77,101 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up Tronbyt brightness entities from a config entry."""
     coordinator = hass.data.get(DOMAIN, {}).get(DATA_COORDINATOR)
     if coordinator is None or not coordinator.data:
         _LOGGER.debug("No Tronbyt devices available; skipping light setup.")
         return
 
-    entities = [
-        TronbytLight(coordinator, device["id"])
-        for device in coordinator.data
-        if device.get("id")
-    ]
+    entities: list[TronbytLight] = []
+    for description in LIGHT_DESCRIPTIONS:
+        for device in coordinator.data:
+            device_id = device.get("id")
+            if device_id is None:
+                continue
+            entities.append(TronbytLight(coordinator, device_id, description))
+
     if entities:
         async_add_entities(entities)
 
 
 class TronbytLight(CoordinatorEntity, LightEntity):
-    """Brightness entity backed by shared Tronbyt device data."""
+    """Brightness style light bound to a Tronbyt device attribute."""
 
-    _attr_color_mode = ColorMode.BRIGHTNESS
     _attr_supported_color_modes = {ColorMode.BRIGHTNESS}
+    _attr_color_mode = ColorMode.BRIGHTNESS
     _attr_has_entity_name = True
 
-    def __init__(self, coordinator, device_id: str) -> None:
+    def __init__(
+        self,
+        coordinator,
+        device_id: str,
+        description: TronbytLightDescription,
+    ) -> None:
         super().__init__(coordinator)
+        self._description = description
         self._deviceid = device_id
-        self._attr_unique_id = f"tronbytlight-{device_id}"
+        self._attr_unique_id = f"tronbyt-{description.key}-{device_id}"
+        self._attr_icon = description.icon
+        self._attr_name = description.name
+        self._attr_entity_category = description.entity_category
 
-    @property
     def _device(self) -> Optional[dict[str, Any]]:
-        if not self.coordinator.data:
-            return None
-        for device in self.coordinator.data:
+        for device in self.coordinator.data or []:
             if device.get("id") == self._deviceid:
                 return device
         return None
 
     @property
-    def name(self) -> str:
-        device = self._device
-        display_name = device.get("name") if device else self._deviceid
-        return f"{display_name} Brightness"
+    def available(self) -> bool:
+        return self._device() is not None
 
     @property
     def brightness(self) -> int | None:
-        device = self._device
+        device = self._device()
         if not device:
             return None
-        percent = device.get("brightness")
-        if percent is None:
+        value = _value_from_device(device, self._description.value_path)
+        if value is None:
             return None
-        return round((percent * 0.01) * 255)
+        value = max(0, min(BRIGHTNESS_API_MAX, value))
+        return int(round((value / BRIGHTNESS_API_MAX) * BRIGHTNESS_MAX))
 
     @property
     def is_on(self) -> bool | None:
-        device = self._device
-        if not device:
+        value = self.brightness
+        if value is None:
             return None
-        percent = device.get("brightness")
-        if percent is None:
-            return None
-        return percent >= BRIGHTNESS_SCALE[0]
-
-    @property
-    def icon(self) -> str:
-        return "mdi:television-ambient-light"
-
-    @property
-    def available(self) -> bool:
-        return self._device is not None
+        return value > 0
 
     @property
     def device_info(self) -> dict[str, Any]:
-        device = self._device or {}
+        device = self._device() or {}
+        model = device.get("type") or "Display"
         name = device.get("name", self._deviceid)
         return {
             "identifiers": {(DOMAIN, self._deviceid)},
             "name": name,
             "manufacturer": "Tronbyt",
-            "model": "Display",
+            "model": model,
         }
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         if ATTR_BRIGHTNESS in kwargs:
-            brightness = round((kwargs[ATTR_BRIGHTNESS] / 255) * 100)
+            brightness = int(kwargs[ATTR_BRIGHTNESS])
         else:
-            device = self._device
-            current = device.get("brightness") if device else None
-            brightness = current if current is not None else BRIGHTNESS_SCALE[1]
+            brightness = self.brightness
+            if brightness is None:
+                brightness = self._description.default_on
 
-        payload = {"brightness": int(brightness)}
-        session = async_get_clientsession(self.hass)
-        url = f"{self.coordinator.base_url}/v0/devices/{self._deviceid}"
-        headers = {
-            "Authorization": f"Bearer {self.coordinator.token}",
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-        }
-        async with session.patch(url, headers=headers, json=payload) as response:
-            if response.status != 200:
-                error = await response.text()
-                _LOGGER.error(
-                    "Failed to set brightness on %s: %s", self._deviceid, error
-                )
-                return
-
-        await self.coordinator.async_request_refresh()
+        brightness = max(BRIGHTNESS_MIN, min(BRIGHTNESS_MAX, brightness))
+        api_value = int(round((brightness / BRIGHTNESS_MAX) * BRIGHTNESS_API_MAX))
+        await self.coordinator.async_patch_device(
+            self._deviceid,
+            {self._description.patch_key: api_value},
+        )
 
     async def async_turn_off(self, **kwargs: Any) -> None:
-        """Tronbyt displays do not support turning fully off via this endpoint."""
-
-    async def async_toggle(self, **kwargs: Any) -> None:
-        await self.async_turn_on(**kwargs)
+        await self.coordinator.async_patch_device(
+            self._deviceid,
+            {self._description.patch_key: 0},
+        )

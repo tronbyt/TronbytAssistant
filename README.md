@@ -28,8 +28,13 @@ Copy the entirety of `custom_components/tronbytassistant` to your `/config/custo
 
 ## Entities
 - Each Tronbyt device exposes a light entity that controls display brightness (0–100%).
-- Each device also exposes an auto-dim switch so you can toggle adaptive brightness in automations.
+- Dedicated lights control night mode and dim mode brightness levels.
+- Each device also exposes a night mode switch so you can toggle adaptive brightness in automations.
 - Home Assistant registers one device entry per Tronbyt display, grouped under the integration named after your server hostname.
+- Additional helpers per display include:
+  - A number entity for the rotation interval.
+  - Time entities for configuring night-mode and dim-mode start/end times.
+  - Select entities for the pinned app and night-mode app IDs (populated from the current installations list).
 
 ## Services
 ### TronbytAssistant: Push

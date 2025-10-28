@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import re
@@ -20,9 +21,9 @@ from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError
 import homeassistant.helpers.config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
-from homeassistant.helpers import device_registry as dr
 
 from .const import (
     ATTR_ARGS,
@@ -48,7 +49,13 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS: list[Platform] = [Platform.LIGHT, Platform.SWITCH]
+PLATFORMS: list[Platform] = [
+    Platform.LIGHT,
+    Platform.SWITCH,
+    Platform.NUMBER,
+    Platform.TIME,
+    Platform.SELECT,
+]
 
 DATA_CONFIG = "config"
 DATA_SERVICES_REGISTERED = "services_registered"
@@ -532,20 +539,135 @@ class TronbytCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
             raise UpdateFailed(f"Error connecting to Tronbyt: {err}") from err
 
         devices: list[dict[str, Any]] = []
+        install_tasks = []
         for item in payload.get("devices", []):
             device_id = item.get("id")
             if not device_id:
                 continue
+
+            night = item.get("nightMode") or {}
+            dim = item.get("dimMode") or {}
+
             devices.append(
                 {
                     "id": device_id,
                     "name": item.get("displayName") or device_id,
+                    "type": item.get("type"),
+                    "notes": item.get("notes"),
+                    "interval": item.get("intervalSec"),
                     "brightness": item.get("brightness"),
-                    "autoDim": item.get("autoDim"),
+                    "night_mode": {
+                        "enabled": night.get("enabled"),
+                        "app": night.get("app"),
+                        "start": night.get("startTime"),
+                        "end": night.get("endTime"),
+                        "brightness": night.get("brightness"),
+                    },
+                    "dim_mode": {
+                        "start": dim.get("startTime"),
+                        "brightness": dim.get("brightness"),
+                    },
+                    "pinned_app": item.get("pinnedApp"),
+                    "auto_dim": item.get("autoDim"),
                 }
             )
+            install_tasks.append(self._async_fetch_installations(session, device_id))
 
         if not devices:
             raise UpdateFailed("No Tronbyt devices were returned by the server.")
 
+        if install_tasks:
+            results = await asyncio.gather(*install_tasks, return_exceptions=True)
+            for device, result in zip(devices, results):
+                if isinstance(result, Exception):
+                    _LOGGER.warning(
+                        "Failed to fetch installations for %s: %s",
+                        device["id"],
+                        result,
+                    )
+                    device["installations"] = []
+                else:
+                    device["installations"] = result
+
         return devices
+
+    async def async_patch_device(self, deviceid: str, payload: dict[str, Any]) -> None:
+        session = async_get_clientsession(self.hass)
+        url = f"{self._base_url}/v0/devices/{deviceid}"
+        headers = {
+            "Authorization": f"Bearer {self._token}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
+
+        async with session.patch(url, headers=headers, json=payload) as response:
+            if response.status != 200:
+                error = await response.text()
+                raise HomeAssistantError(f"Failed to update device {deviceid}: {error}")
+
+            device_payload = await response.json()
+
+        install_payload = await self._async_fetch_installations(session, deviceid)
+
+        self._merge_device_update(deviceid, device_payload, install_payload)
+
+        self.async_set_updated_data(self.data)
+
+    async def _async_fetch_installations(
+        self, session: aiohttp.ClientSession, deviceid: str
+    ) -> list[dict[str, Any]]:
+        url = f"{self._base_url}/v0/devices/{deviceid}/installations"
+        headers = {
+            "Authorization": f"Bearer {self._token}",
+            "Accept": "application/json",
+        }
+        async with session.get(url, headers=headers) as response:
+            if response.status != 200:
+                error = await response.text()
+                raise UpdateFailed(
+                    f"Failed to fetch installations for {deviceid}: {error}"
+                )
+            payload = await response.json()
+        return payload.get("installations", [])
+
+    def _merge_device_update(
+        self,
+        deviceid: str,
+        device_payload: dict[str, Any],
+        installations: list[dict[str, Any]],
+    ) -> None:
+        if not self.data:
+            return
+
+        for idx, device in enumerate(self.data):
+            if device.get("id") != deviceid:
+                continue
+
+            night = device_payload.get("nightMode") or {}
+            dim = device_payload.get("dimMode") or {}
+
+            updated = {
+                "id": deviceid,
+                "name": device_payload.get("displayName") or deviceid,
+                "type": device_payload.get("type"),
+                "notes": device_payload.get("notes"),
+                "interval": device_payload.get("intervalSec"),
+                "brightness": device_payload.get("brightness"),
+                "night_mode": {
+                    "enabled": night.get("enabled"),
+                    "app": night.get("app"),
+                    "start": night.get("startTime"),
+                    "end": night.get("endTime"),
+                    "brightness": night.get("brightness"),
+                },
+                "dim_mode": {
+                    "start": dim.get("startTime"),
+                    "brightness": dim.get("brightness"),
+                },
+                "pinned_app": device_payload.get("pinnedApp"),
+                "auto_dim": device_payload.get("autoDim"),
+                "installations": installations,
+            }
+
+            self.data[idx] = updated
+            break
