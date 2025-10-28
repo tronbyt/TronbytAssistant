@@ -48,9 +48,9 @@ class TronbytNightModeSwitch(CoordinatorEntity, SwitchEntity):
     """Expose the Tronbyt night mode flag as a switch."""
 
     _attr_has_entity_name = True
-    _attr_name = "Night Mode"
     _attr_icon = "mdi:brightness-auto"
     _attr_entity_category = EntityCategory.CONFIG
+    _attr_translation_key = "night_mode_switch"
 
     def __init__(self, coordinator, device_id: str) -> None:
         super().__init__(coordinator)
@@ -112,6 +112,7 @@ class TronbytInstallationSwitch(CoordinatorEntity, SwitchEntity):
     _attr_entity_category = EntityCategory.CONFIG
     _attr_entity_registry_enabled_default = False
     _attr_entity_registry_visible_default = False
+    _attr_translation_key = "installation_switch"
 
     def __init__(self, coordinator, device_id: str, installation_id: str) -> None:
         super().__init__(coordinator)
@@ -139,23 +140,29 @@ class TronbytInstallationSwitch(CoordinatorEntity, SwitchEntity):
         return self._installation() is not None
 
     @property
-    def name(self) -> str:
-        install = self._installation()
-        if not install:
-            return f"Installation {self._installid}"
-        label = (install.get("appID") or "").strip()
-        if label:
-            label = f"{label}-{self._installid}"
-        else:
-            label = str(self._installid)
-        return f"Enable {label}"
-
-    @property
     def is_on(self) -> bool | None:
         install = self._installation()
         if not install:
             return None
         return bool(install.get("enabled"))
+
+    def _display_label(self) -> str:
+        install = self._installation()
+        if install:
+            label = (install.get("appID") or "").strip()
+            if label:
+                return f"{label}-{self._installid}"
+        return str(self._installid)
+
+    @property
+    def translation_placeholders(self) -> dict[str, str]:
+        return {"label": self._display_label()}
+
+    @property
+    def name(self) -> str | None:
+        if getattr(self, "platform_data", None) is None:
+            return f"Enable {self._display_label()}"
+        return super().name
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         await self.coordinator.async_patch_installation(

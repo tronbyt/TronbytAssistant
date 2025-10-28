@@ -12,16 +12,17 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DATA_COORDINATOR, DOMAIN
 
+NONE_OPTION = "none"
+
 
 @dataclass(frozen=True)
 class TronbytSelectDescription:
     key: str
-    name: str
+    translation_key: str | None
     icon: str | None
     value_fn: Callable[[dict[str, Any]], Optional[str]]
     patch_key: str
     allow_none: bool = True
-    translation_key: str | None = None
     entity_registry_enabled_default: bool = True
     entity_registry_visible_default: bool = True
     entity_category: EntityCategory | None = EntityCategory.CONFIG
@@ -30,14 +31,14 @@ class TronbytSelectDescription:
 SELECT_DESCRIPTIONS: tuple[TronbytSelectDescription, ...] = (
     TronbytSelectDescription(
         key="night_mode_app",
-        name="Night Mode App",
+        translation_key="night_mode_app",
         icon="mdi:application",
         value_fn=lambda device: (device.get("night_mode") or {}).get("app"),
         patch_key="nightModeApp",
     ),
     TronbytSelectDescription(
         key="pinned_app",
-        name="Pinned App",
+        translation_key="pinned_app",
         icon="mdi:pin",
         value_fn=lambda device: device.get("pinned_app"),
         patch_key="pinnedApp",
@@ -82,7 +83,6 @@ class TronbytSelect(CoordinatorEntity, SelectEntity):
         self._deviceid = device_id
         self._attr_unique_id = f"tronbyt-{description.key}-{device_id}"
         self._attr_icon = description.icon
-        self._attr_name = description.name
         self._attr_translation_key = description.translation_key
         self._attr_entity_registry_enabled_default = (
             description.entity_registry_enabled_default
@@ -122,7 +122,7 @@ class TronbytSelect(CoordinatorEntity, SelectEntity):
                 options.append(str(install_id))
         options.sort()
         if self._description.allow_none:
-            return ["None"] + options
+            return [NONE_OPTION] + options
         return options
 
     @property
@@ -131,10 +131,8 @@ class TronbytSelect(CoordinatorEntity, SelectEntity):
         if not device:
             return None
         value = self._normalize_value(self._description.value_fn(device))
-        if value is None and self._description.allow_none:
-            return "None"
         if value is None:
-            return None
+            return NONE_OPTION if self._description.allow_none else None
         installs = device.get("installations") or []
         for install in installs:
             install_id = install.get("id")
@@ -147,7 +145,7 @@ class TronbytSelect(CoordinatorEntity, SelectEntity):
         return value
 
     async def async_select_option(self, option: str) -> None:
-        if option == "None" and self._description.allow_none:
+        if option == NONE_OPTION and self._description.allow_none:
             payload_value = ""
         else:
             payload_value = option.rsplit("-", 1)[-1].strip()
@@ -161,7 +159,7 @@ class TronbytSelect(CoordinatorEntity, SelectEntity):
         if value is None:
             return None
         trimmed = value.strip()
-        if not trimmed or trimmed.lower() == "none":
+        if not trimmed or trimmed.lower() == NONE_OPTION:
             return None
         return trimmed
 

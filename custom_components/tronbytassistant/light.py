@@ -41,7 +41,7 @@ def _value_from_device(device: dict[str, Any], path: list[str]) -> Optional[int]
 @dataclass(frozen=True)
 class TronbytLightDescription:
     key: str
-    name: str
+    translation_key: str | None
     icon: str | None
     value_path: list[str]
     patch_key: str
@@ -52,14 +52,14 @@ class TronbytLightDescription:
 LIGHT_DESCRIPTIONS: tuple[TronbytLightDescription, ...] = (
     TronbytLightDescription(
         key="brightness",
-        name="Brightness",
+        translation_key="brightness",
         icon="mdi:television-ambient-light",
         value_path=["brightness"],
         patch_key="brightness",
     ),
     TronbytLightDescription(
         key="night_mode_brightness",
-        name="Night Mode Brightness",
+        translation_key="night_mode_brightness",
         icon="mdi:brightness-6",
         value_path=["night_mode", "brightness"],
         patch_key="nightModeBrightness",
@@ -67,7 +67,7 @@ LIGHT_DESCRIPTIONS: tuple[TronbytLightDescription, ...] = (
     ),
     TronbytLightDescription(
         key="dim_mode_brightness",
-        name="Dim Mode Brightness",
+        translation_key="dim_mode_brightness",
         icon="mdi:brightness-4",
         value_path=["dim_mode", "brightness"],
         patch_key="dimModeBrightness",
@@ -116,7 +116,7 @@ class TronbytLight(CoordinatorEntity, LightEntity):
         self._deviceid = device_id
         self._attr_unique_id = f"tronbyt-{description.key}-{device_id}"
         self._attr_icon = description.icon
-        self._attr_name = description.name
+        self._attr_translation_key = description.translation_key
         self._attr_entity_category = description.entity_category
 
     def _device(self) -> Optional[dict[str, Any]]:

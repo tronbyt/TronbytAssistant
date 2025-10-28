@@ -157,7 +157,7 @@ def test_select_options_and_current_option(coordinator: TronbytCoordinator):
         coordinator, "dev1", select_mod.SELECT_DESCRIPTIONS[0]
     )
     options = entity.options
-    assert options[0] == "None"
+    assert options[0] == select_mod.NONE_OPTION
     assert "Custom Clock-477" in options
     assert "999" in options
     assert entity.current_option == "Custom Clock-477"
@@ -177,7 +177,7 @@ async def test_select_option_updates_device(coordinator: TronbytCoordinator):
     )
 
     coordinator.async_patch_device.reset_mock()
-    await entity.async_select_option("None")
+    await entity.async_select_option(select_mod.NONE_OPTION)
     coordinator.async_patch_device.assert_awaited_once_with("dev1", {"pinnedApp": ""})
 
 
@@ -187,6 +187,7 @@ def test_select_normalize_value():
     assert normalize(None) is None
     assert normalize("  ") is None
     assert normalize("None") is None
+    assert normalize(select_mod.NONE_OPTION) is None
     assert normalize("Custom") == "Custom"
 
 
