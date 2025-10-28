@@ -7,7 +7,7 @@ Display notifications from Home Assistant to Tronbyt devices using this integrat
 ## HACS
 You can add this repository to HACS if you have it installed by adding this link to your custom repository (click the 3 dots at the top right):
 ```txt
-https://github.com/gabe565/TronbytAssistant
+https://github.com/tronbyt/TronbytAssistant
 ```
 Then just search for TronbytAssistant and install the integration. You will have to restart HomeAssistant.
 
