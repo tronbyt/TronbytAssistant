@@ -4,7 +4,8 @@
       "user": {
         "data": {
           "apiurl": "API-URL",
-          "token": "Benutzer-Token"
+          "token": "Benutzer-Token",
+          "verify_ssl": "SSL-Zertifikat überprüfen"
         }
       }
     }

@@ -14,7 +14,12 @@ from custom_components.tronbytassistant.config_flow import (
     TronbytAssistantConfigFlow,
     _normalize_base_url,
 )
-from custom_components.tronbytassistant.const import CONF_API_URL, CONF_TOKEN, DOMAIN
+from custom_components.tronbytassistant.const import (
+    CONF_API_URL,
+    CONF_TOKEN,
+    CONF_VERIFY_SSL,
+    DOMAIN,
+)
 
 
 @pytest.mark.asyncio
@@ -35,6 +40,7 @@ async def test_user_flow_success(hass):
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["title"] == "example.com"
     assert result["data"][CONF_TOKEN] == "secret"
+    assert result["data"][CONF_VERIFY_SSL] is True
 
 
 @pytest.mark.asyncio
@@ -120,6 +126,7 @@ async def test_import_flow_success(hass):
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["data"][CONF_API_URL] == "https://example.com/api"
+    assert result["data"][CONF_VERIFY_SSL] is True
 
 
 @pytest.mark.asyncio

@@ -47,7 +47,7 @@ def device_payload() -> dict[str, Any]:
 @pytest.fixture
 def coordinator(hass, device_payload: dict[str, Any]) -> TronbytCoordinator:
     """Coordinator instance with seeded device data."""
-    coordinator = TronbytCoordinator(hass, "https://api.example", "token")
+    coordinator = TronbytCoordinator(hass, "https://api.example", "token", True)
     coordinator.data = [deepcopy(device_payload)]
     return coordinator
 
