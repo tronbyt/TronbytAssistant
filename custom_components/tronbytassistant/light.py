@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from collections.abc import Mapping
 from typing import Any, Optional
 
 from homeassistant.components.light import ATTR_BRIGHTNESS, ColorMode, LightEntity
@@ -25,7 +26,10 @@ def _value_from_device(device: dict[str, Any], path: list[str]) -> Optional[int]
     for key in path:
         if current is None:
             return None
-        current = current.get(key)
+        if isinstance(current, Mapping):
+            current = current.get(key)
+        else:
+            return None
     if current is None:
         return None
     try:
