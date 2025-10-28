@@ -502,7 +502,6 @@ class TronbytCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
                         "brightness": dim.get("brightness"),
                     },
                     "pinned_app": item.get("pinnedApp"),
-                    "auto_dim": item.get("autoDim"),
                 }
             )
             install_tasks.append(self._async_fetch_installations(session, device_id))
@@ -622,7 +621,6 @@ class TronbytCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
                     "brightness": dim.get("brightness"),
                 },
                 "pinned_app": device_payload.get("pinnedApp"),
-                "auto_dim": device_payload.get("autoDim"),
                 "installations": installations,
             }
 

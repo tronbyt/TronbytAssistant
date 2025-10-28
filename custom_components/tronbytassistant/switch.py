@@ -98,10 +98,7 @@ class TronbytNightModeSwitch(CoordinatorEntity, SwitchEntity):
     async def _async_set_night_mode(self, enabled: bool) -> None:
         await self.coordinator.async_patch_device(
             self._deviceid,
-            {
-                "nightModeEnabled": enabled,
-                "autoDim": enabled,
-            },
+            {"nightModeEnabled": enabled},
         )
 
 

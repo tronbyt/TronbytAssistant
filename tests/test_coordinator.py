@@ -106,7 +106,6 @@ async def test_coordinator_fetches_devices_with_installations(hass: HomeAssistan
                         },
                         "dimMode": {"startTime": "07:00", "brightness": 10},
                         "pinnedApp": "123",
-                        "autoDim": False,
                     }
                 ]
             },
@@ -203,7 +202,6 @@ async def test_async_patch_device_updates_local_state(hass: HomeAssistant):
                 "nightMode": {"enabled": True, "app": "999", "startTime": "20:00"},
                 "dimMode": {"startTime": "07:00", "brightness": 12},
                 "pinnedApp": "999",
-                "autoDim": True,
             },
         ),
     )
@@ -330,7 +328,6 @@ def test_merge_device_update_overwrites_fields(hass: HomeAssistant):
             "nightMode": {"enabled": True, "app": "abc"},
             "dimMode": {"startTime": "20:00", "brightness": 5},
             "pinnedApp": "abc",
-            "autoDim": True,
         },
         [{"id": "inst1"}],
     )

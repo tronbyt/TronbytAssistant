@@ -208,7 +208,7 @@ async def test_night_mode_switch_updates_both_flags(coordinator: TronbytCoordina
     await entity.async_turn_off()
     coordinator.async_patch_device.assert_awaited_once_with(
         "dev1",
-        {"nightModeEnabled": False, "autoDim": False},
+        {"nightModeEnabled": False},
     )
 
 
