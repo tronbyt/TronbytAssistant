@@ -26,7 +26,6 @@ class TronbytNumberDescription:
     unit: str | None = None
     device_class: str | None = None
     entity_registry_enabled_default: bool = True
-    entity_registry_visible_default: bool = True
     entity_category: EntityCategory | None = None
 
 
@@ -93,7 +92,6 @@ class TronbytNumber(CoordinatorEntity, NumberEntity):
         self._attr_entity_registry_enabled_default = (
             description.entity_registry_enabled_default
         )
-        self._attr_entity_registry_visible_default = False
         self._attr_entity_category = description.entity_category
 
     def _device(self) -> dict[str, Any] | None:

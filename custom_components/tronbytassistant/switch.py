@@ -111,7 +111,6 @@ class TronbytInstallationSwitch(CoordinatorEntity, SwitchEntity):
     _attr_has_entity_name = True
     _attr_entity_category = EntityCategory.CONFIG
     _attr_entity_registry_enabled_default = False
-    _attr_entity_registry_visible_default = False
     _attr_translation_key = "installation_switch"
 
     def __init__(self, coordinator, device_id: str, installation_id: str) -> None:

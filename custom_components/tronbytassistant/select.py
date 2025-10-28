@@ -24,7 +24,6 @@ class TronbytSelectDescription:
     patch_key: str
     allow_none: bool = True
     entity_registry_enabled_default: bool = True
-    entity_registry_visible_default: bool = True
     entity_category: EntityCategory | None = EntityCategory.CONFIG
 
 
@@ -87,7 +86,6 @@ class TronbytSelect(CoordinatorEntity, SelectEntity):
         self._attr_entity_registry_enabled_default = (
             description.entity_registry_enabled_default
         )
-        self._attr_entity_registry_visible_default = False
         self._attr_entity_category = description.entity_category
         self._attr_device_class = None
 

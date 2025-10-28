@@ -22,7 +22,6 @@ class TronbytTimeDescription:
     value_fn: Callable[[dict[str, Any]], str | None]
     patch_key: str
     entity_registry_enabled_default: bool = True
-    entity_registry_visible_default: bool = True
     entity_category: EntityCategory | None = EntityCategory.CONFIG
 
 
@@ -92,7 +91,6 @@ class TronbytTime(CoordinatorEntity, TimeEntity):
         self._attr_entity_registry_enabled_default = (
             description.entity_registry_enabled_default
         )
-        self._attr_entity_registry_visible_default = False
         self._attr_translation_key = description.translation_key
         self._attr_entity_category = description.entity_category
         self._attr_native_unit_of_measurement = None
