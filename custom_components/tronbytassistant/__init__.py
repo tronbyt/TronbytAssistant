@@ -557,6 +557,29 @@ class TronbytCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
 
         self.async_set_updated_data(self.data)
 
+    async def async_patch_installation(
+        self, deviceid: str, installation_id: str, payload: dict[str, Any]
+    ) -> None:
+        session = async_get_clientsession(self.hass)
+        url = f"{self._base_url}/v0/devices/{deviceid}/installations/{installation_id}"
+        headers = {
+            "Authorization": f"Bearer {self._token}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
+
+        async with session.patch(url, headers=headers, json=payload) as response:
+            if response.status != 200:
+                error = await response.text()
+                raise HomeAssistantError(
+                    f"Failed to update installation {installation_id}: {error}"
+                )
+
+            installation_payload = await response.json()
+
+        self._merge_installation_update(deviceid, installation_payload)
+        self.async_set_updated_data(self.data)
+
     async def _async_fetch_installations(
         self, session: aiohttp.ClientSession, deviceid: str
     ) -> list[dict[str, Any]]:
@@ -614,4 +637,26 @@ class TronbytCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
             }
 
             self.data[idx] = updated
+            break
+
+    def _merge_installation_update(
+        self, deviceid: str, installation_payload: dict[str, Any]
+    ) -> None:
+        if not self.data:
+            return
+
+        install_id = installation_payload.get("id")
+        if not install_id:
+            return
+
+        for device in self.data:
+            if device.get("id") != deviceid:
+                continue
+            installs = device.setdefault("installations", [])
+            for idx, install in enumerate(installs):
+                if install.get("id") == install_id:
+                    installs[idx] = installation_payload
+                    break
+            else:
+                installs.append(installation_payload)
             break
