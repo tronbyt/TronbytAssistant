@@ -37,9 +37,9 @@ class TronbytAssistantConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 except CannotConnect:
                     errors["base"] = "cannot_connect"
                 except InvalidAuth:
-                    errors["base"] = "invalid_auth"
+                    errors["base"] = "invalid_api_key"
                 except NoDevicesFound:
-                    errors["base"] = "no_devices"
+                    errors["base"] = "no_devices_found"
                 else:
                     await self.async_set_unique_id(DOMAIN)
                     self._abort_if_unique_id_configured()
@@ -82,6 +82,10 @@ class TronbytAssistantConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         try:
             await self._async_fetch_devices(api_url, token, verify_ssl)
+        except InvalidAuth:
+            return self.async_abort(reason="invalid_api_key")
+        except NoDevicesFound:
+            return self.async_abort(reason="no_devices_found")
         except HomeAssistantError:
             return self.async_abort(reason="cannot_connect")
 

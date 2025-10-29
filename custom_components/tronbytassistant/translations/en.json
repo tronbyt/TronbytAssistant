@@ -3,11 +3,17 @@
     "step": {
       "user": {
         "data": {
-          "apiurl": "API URL",
-          "token": "User Token",
+          "apiurl": "Server URL",
+          "token": "User API key",
           "verify_ssl": "Verify SSL certificate"
         }
       }
+    },
+    "error": {
+      "invalid_url": "Invalid URL",
+      "invalid_api_key": "Invalid API key",
+      "cannot_connect": "Failed to connect",
+      "no_devices_found": "No devices found on the network"
     }
   },
   "entity": {

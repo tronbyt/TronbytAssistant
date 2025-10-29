@@ -71,7 +71,7 @@ async def test_user_flow_invalid_auth(hass):
         )
 
     assert result["type"] is FlowResultType.FORM
-    assert result["errors"]["base"] == "invalid_auth"
+    assert result["errors"]["base"] == "invalid_api_key"
 
 
 @pytest.mark.asyncio
@@ -107,7 +107,7 @@ async def test_user_flow_no_devices(hass):
         )
 
     assert result["type"] is FlowResultType.FORM
-    assert result["errors"]["base"] == "no_devices"
+    assert result["errors"]["base"] == "no_devices_found"
 
 
 @pytest.mark.asyncio

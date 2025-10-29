@@ -3,11 +3,17 @@
     "step": {
       "user": {
         "data": {
-          "apiurl": "API-URL",
-          "token": "Benutzer-Token",
+          "apiurl": "Server-URL",
+          "token": "Benutzer-API-Schlüssel",
           "verify_ssl": "SSL-Zertifikat überprüfen"
         }
       }
+    },
+    "error": {
+      "invalid_url": "Ungültige URL",
+      "invalid_api_key": "Ungültiger API-Schlüssel",
+      "cannot_connect": "Verbindung fehlgeschlagen",
+      "no_devices_found": "Keine Geräte im Netzwerk gefunden"
     }
   },
   "entity": {
