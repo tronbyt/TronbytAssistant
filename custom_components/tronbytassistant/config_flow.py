@@ -13,6 +13,14 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import CONF_API_URL, CONF_TOKEN, CONF_VERIFY_SSL, DOMAIN
 
+USER_DATA_SCHEMA = vol.Schema(
+    {
+        vol.Required(CONF_API_URL): str,
+        vol.Required(CONF_TOKEN): str,
+        vol.Optional(CONF_VERIFY_SSL, default=True): bool,
+    }
+)
+
 
 class TronbytAssistantConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for TronbytAssistant."""
@@ -56,15 +64,11 @@ class TronbytAssistantConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         },
                     )
 
+        schema = self.add_suggested_values_to_schema(USER_DATA_SCHEMA, user_input)
+
         return self.async_show_form(
             step_id="user",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(CONF_API_URL): str,
-                    vol.Required(CONF_TOKEN): str,
-                    vol.Optional(CONF_VERIFY_SSL, default=True): bool,
-                }
-            ),
+            data_schema=schema,
             errors=errors,
         )
 

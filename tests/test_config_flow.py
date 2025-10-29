@@ -3,7 +3,7 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, patch
 
 import pytest
-
+import voluptuous as vol
 from homeassistant.config_entries import SOURCE_IMPORT, SOURCE_USER
 from homeassistant.data_entry_flow import FlowResultType
 
@@ -20,6 +20,21 @@ from custom_components.tronbytassistant.const import (
     CONF_VERIFY_SSL,
     DOMAIN,
 )
+
+
+def _get_suggested_value(schema: vol.Schema, field: str):
+    for key in schema.schema:
+        if getattr(key, "schema", None) == field:
+            description = getattr(key, "description", None) or {}
+            if "suggested_value" in description:
+                return description["suggested_value"]
+            default = getattr(key, "default", None)
+            if default is None:
+                return None
+            if callable(default):
+                return default()
+            return default
+    raise AssertionError(f"Field {field} not present in schema")
 
 
 @pytest.mark.asyncio
@@ -55,6 +70,11 @@ async def test_user_flow_rejects_bad_url(hass):
     assert result["type"] is FlowResultType.FORM
     assert result["errors"]["base"] == "invalid_url"
 
+    schema = result["data_schema"]
+    assert _get_suggested_value(schema, CONF_API_URL) == "example.com"
+    assert _get_suggested_value(schema, CONF_TOKEN) == "secret"
+    assert _get_suggested_value(schema, CONF_VERIFY_SSL) is True
+
 
 @pytest.mark.asyncio
 async def test_user_flow_invalid_auth(hass):
@@ -72,6 +92,11 @@ async def test_user_flow_invalid_auth(hass):
 
     assert result["type"] is FlowResultType.FORM
     assert result["errors"]["base"] == "invalid_api_key"
+
+    schema = result["data_schema"]
+    assert _get_suggested_value(schema, CONF_API_URL) == "https://example.com"
+    assert _get_suggested_value(schema, CONF_TOKEN) == "bad"
+    assert _get_suggested_value(schema, CONF_VERIFY_SSL) is True
 
 
 @pytest.mark.asyncio
@@ -91,6 +116,11 @@ async def test_user_flow_cannot_connect(hass):
     assert result["type"] is FlowResultType.FORM
     assert result["errors"]["base"] == "cannot_connect"
 
+    schema = result["data_schema"]
+    assert _get_suggested_value(schema, CONF_API_URL) == "https://example.com"
+    assert _get_suggested_value(schema, CONF_TOKEN) == "token"
+    assert _get_suggested_value(schema, CONF_VERIFY_SSL) is True
+
 
 @pytest.mark.asyncio
 async def test_user_flow_no_devices(hass):
@@ -108,6 +138,11 @@ async def test_user_flow_no_devices(hass):
 
     assert result["type"] is FlowResultType.FORM
     assert result["errors"]["base"] == "no_devices_found"
+
+    schema = result["data_schema"]
+    assert _get_suggested_value(schema, CONF_API_URL) == "https://example.com"
+    assert _get_suggested_value(schema, CONF_TOKEN) == "token"
+    assert _get_suggested_value(schema, CONF_VERIFY_SSL) is True
 
 
 @pytest.mark.asyncio
@@ -154,3 +189,28 @@ def test_config_flow_normalize_base_url():
 
     with pytest.raises(ValueError):
         _normalize_base_url("example.com")
+
+
+@pytest.mark.asyncio
+async def test_user_flow_preserves_verify_ssl_toggle(hass):
+    """Ensure toggled SSL flag persists after an error."""
+    with patch.object(
+        TronbytAssistantConfigFlow,
+        "_async_fetch_devices",
+        AsyncMock(side_effect=CannotConnect),
+    ):
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN,
+            context={"source": SOURCE_USER},
+            data={
+                CONF_API_URL: "https://example.com",
+                CONF_TOKEN: "secret",
+                CONF_VERIFY_SSL: False,
+            },
+        )
+
+    assert result["errors"]["base"] == "cannot_connect"
+    schema = result["data_schema"]
+    assert _get_suggested_value(schema, CONF_API_URL) == "https://example.com"
+    assert _get_suggested_value(schema, CONF_TOKEN) == "secret"
+    assert _get_suggested_value(schema, CONF_VERIFY_SSL) is False
