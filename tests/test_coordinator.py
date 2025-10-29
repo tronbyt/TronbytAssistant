@@ -75,7 +75,7 @@ class MockSession:
 
 
 def _coordinator(hass: HomeAssistant) -> TronbytCoordinator:
-    return TronbytCoordinator(hass, "https://api.example", "token")
+    return TronbytCoordinator(hass, "https://api.example", "token", True)
 
 
 @pytest.mark.asyncio

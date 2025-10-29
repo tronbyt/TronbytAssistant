@@ -2,6 +2,7 @@ DOMAIN = "tronbytassistant"
 
 CONF_TOKEN = "token"
 CONF_API_URL = "apiurl"
+CONF_VERIFY_SSL = "verify_ssl"
 ATTR_CONTENT = "content"
 ATTR_DEVICENANME = "devicename"
 ATTR_DEVICE_IDS = "device_ids"

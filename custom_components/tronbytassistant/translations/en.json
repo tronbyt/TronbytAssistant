@@ -4,7 +4,8 @@
       "user": {
         "data": {
           "apiurl": "API URL",
-          "token": "User Token"
+          "token": "User Token",
+          "verify_ssl": "Verify SSL certificate"
         }
       }
     }

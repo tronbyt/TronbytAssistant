@@ -40,6 +40,7 @@ from .const import (
     ATTR_TITLE_FONT,
     CONF_API_URL,
     CONF_TOKEN,
+    CONF_VERIFY_SSL,
     DATA_COORDINATOR,
     DOMAIN,
 )
@@ -70,6 +71,7 @@ CONFIG_SCHEMA = vol.Schema(
             {
                 vol.Required(CONF_API_URL): cv.string,
                 vol.Required(CONF_TOKEN): cv.string,
+                vol.Optional(CONF_VERIFY_SSL, default=True): cv.boolean,
             }
         ),
     },
@@ -114,10 +116,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             "Tronbyt base URL must include the protocol (e.g. https://host)"
         ) from err
 
+    verify_ssl = cv.boolean(conf.get(CONF_VERIFY_SSL, True))
+    conf[CONF_VERIFY_SSL] = verify_ssl
+
     coordinator = TronbytCoordinator(
         hass,
         conf[CONF_API_URL],
         conf[CONF_TOKEN],
+        verify_ssl,
     )
     await coordinator.async_config_entry_first_refresh()
 
@@ -154,7 +160,7 @@ async def _async_register_services(
     if data.get(DATA_SERVICES_REGISTERED):
         return
 
-    session = async_get_clientsession(hass)
+    session = async_get_clientsession(hass, verify_ssl=coordinator.verify_ssl)
     device_reg = dr.async_get(hass)
 
     def _get_device_maps() -> tuple[
@@ -434,9 +440,12 @@ def _clone_config(value: Any) -> Any:
 class TronbytCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
     """Coordinate Tronbyt device state via a shared API call."""
 
-    def __init__(self, hass: HomeAssistant, base_url: str, token: str) -> None:
+    def __init__(
+        self, hass: HomeAssistant, base_url: str, token: str, verify_ssl: bool
+    ) -> None:
         self._base_url = base_url
         self._token = token
+        self._verify_ssl = verify_ssl
         super().__init__(
             hass,
             _LOGGER,
@@ -452,8 +461,12 @@ class TronbytCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
     def token(self) -> str:
         return self._token
 
+    @property
+    def verify_ssl(self) -> bool:
+        return self._verify_ssl
+
     async def _async_update_data(self) -> list[dict[str, Any]]:
-        session = async_get_clientsession(self.hass)
+        session = async_get_clientsession(self.hass, verify_ssl=self._verify_ssl)
         endpoint = f"{self._base_url}/v0/devices"
         headers = {
             "Authorization": f"Bearer {self._token}",
@@ -525,7 +538,7 @@ class TronbytCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
         return devices
 
     async def async_patch_device(self, deviceid: str, payload: dict[str, Any]) -> None:
-        session = async_get_clientsession(self.hass)
+        session = async_get_clientsession(self.hass, verify_ssl=self._verify_ssl)
         url = f"{self._base_url}/v0/devices/{deviceid}"
         headers = {
             "Authorization": f"Bearer {self._token}",
@@ -549,7 +562,7 @@ class TronbytCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
     async def async_patch_installation(
         self, deviceid: str, installation_id: str, payload: dict[str, Any]
     ) -> None:
-        session = async_get_clientsession(self.hass)
+        session = async_get_clientsession(self.hass, verify_ssl=self._verify_ssl)
         url = f"{self._base_url}/v0/devices/{deviceid}/installations/{installation_id}"
         headers = {
             "Authorization": f"Bearer {self._token}",

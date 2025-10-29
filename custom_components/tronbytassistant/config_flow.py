@@ -9,8 +9,9 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .const import CONF_API_URL, CONF_TOKEN, DOMAIN
+from .const import CONF_API_URL, CONF_TOKEN, CONF_VERIFY_SSL, DOMAIN
 
 
 class TronbytAssistantConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -28,8 +29,11 @@ class TronbytAssistantConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 errors["base"] = "invalid_url"
             else:
                 token = user_input[CONF_TOKEN]
+                verify_ssl = user_input.get(CONF_VERIFY_SSL, True)
                 try:
-                    devices = await self._async_fetch_devices(api_url, token)
+                    devices = await self._async_fetch_devices(
+                        api_url, token, verify_ssl
+                    )
                 except CannotConnect:
                     errors["base"] = "cannot_connect"
                 except InvalidAuth:
@@ -48,6 +52,7 @@ class TronbytAssistantConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         data={
                             CONF_API_URL: api_url,
                             CONF_TOKEN: token,
+                            CONF_VERIFY_SSL: verify_ssl,
                         },
                     )
 
@@ -57,6 +62,7 @@ class TronbytAssistantConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 {
                     vol.Required(CONF_API_URL): str,
                     vol.Required(CONF_TOKEN): str,
+                    vol.Optional(CONF_VERIFY_SSL, default=True): bool,
                 }
             ),
             errors=errors,
@@ -72,8 +78,10 @@ class TronbytAssistantConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if not token:
             return self.async_abort(reason="invalid_import")
 
+        verify_ssl = user_input.get(CONF_VERIFY_SSL, True)
+
         try:
-            await self._async_fetch_devices(api_url, token)
+            await self._async_fetch_devices(api_url, token, verify_ssl)
         except HomeAssistantError:
             return self.async_abort(reason="cannot_connect")
 
@@ -81,11 +89,15 @@ class TronbytAssistantConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._abort_if_unique_id_configured()
         return self.async_create_entry(
             title=urlparse(api_url).hostname or urlparse(api_url).netloc or api_url,
-            data={CONF_API_URL: api_url, CONF_TOKEN: token},
+            data={
+                CONF_API_URL: api_url,
+                CONF_TOKEN: token,
+                CONF_VERIFY_SSL: verify_ssl,
+            },
         )
 
     async def _async_fetch_devices(
-        self, api_url: str, token: str
+        self, api_url: str, token: str, verify_ssl: bool
     ) -> list[dict[str, Any]]:
         endpoint = f"{api_url}/v0/devices"
         headers = {
@@ -93,16 +105,16 @@ class TronbytAssistantConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             "Accept": "application/json",
         }
 
-        async with aiohttp.ClientSession() as session:
-            try:
-                async with session.get(endpoint, headers=headers) as response:
-                    if response.status == 401:
-                        raise InvalidAuth
-                    if response.status != 200:
-                        raise CannotConnect
-                    payload = await response.json()
-            except aiohttp.ClientError as err:
-                raise CannotConnect from err
+        session = async_get_clientsession(self.hass, verify_ssl=verify_ssl)
+        try:
+            async with session.get(endpoint, headers=headers) as response:
+                if response.status == 401:
+                    raise InvalidAuth
+                if response.status != 200:
+                    raise CannotConnect
+                payload = await response.json()
+        except aiohttp.ClientError as err:
+            raise CannotConnect from err
 
         devices = payload.get("devices") or []
         if not devices:
