@@ -142,6 +142,24 @@ text:
             - 6x10
             - 6x10-rounded
             - 6x13
+            - terminus-12
+            - terminus-12-light
+            - terminus-14
+            - terminus-14-light
+            - terminus-16
+            - terminus-16-light
+            - terminus-18
+            - terminus-18-light
+            - terminus-20
+            - terminus-20-light
+            - terminus-22
+            - terminus-22-light
+            - terminus-24
+            - terminus-24-light
+            - terminus-28
+            - terminus-28-light
+            - terminus-32
+            - terminus-32-light
     color:
       name: Color
       description: Font color for the text.
