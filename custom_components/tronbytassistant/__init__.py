@@ -338,17 +338,17 @@ async def _async_register_services(
                 content = custom_content
 
                 args = call.data.get(ATTR_ARGS)
-                if args:
-                    parts = args.split(";")
-                    for pair in parts:
-                        if not pair:
-                            continue
-                        if "=" not in pair:
-                            raise HomeAssistantError(
-                                "Arguments must be provided as key=value pairs separated by ';'"
-                            )
-                        key, value = pair.split("=", maxsplit=1)
-                        arguments[key] = value
+                if isinstance(args, str):
+                    args = args.split(";")
+                for pair in args:
+                    if not pair:
+                        continue
+                    if "=" not in pair:
+                        raise HomeAssistantError(
+                            "Arguments must be provided as key=value pairs"
+                        )
+                    key, value = pair.split("=", maxsplit=1)
+                    arguments[key] = value
             else:
                 raise HomeAssistantError(f"Unsupported content type: {contenttype}")
 

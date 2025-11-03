@@ -81,9 +81,10 @@ push:
             text: {}
         arguments:
           name: Arguments
-          description: "Arguments you want to send to your .star app. This must be a key=value pair, separated by a semi-colon (;). Example: key=value;key2=value 2;key3=value3"
+          description: Arguments you want to send to your .star app. Each argument must be a key=value pair.
           selector:
-            text: {}
+            text:
+              multiple: true
     advanced:
       name: Advanced
       collapsed: true
