@@ -164,24 +164,9 @@ text:
       name: Color
       description: Font color for the text.
       required: true
-      default: '#fff'
-      selector: &colors
-        select:
-          options:
-            - label: White
-              value: '#fff'
-            - label: Blue
-              value: '#00f'
-            - label: Red
-              value: '#f00'
-            - label: Green
-              value: '#090'
-            - label: Yellow
-              value: '#ff0'
-            - label: Cyan
-              value: '#0ff'
-            - label: Lime
-              value: '#0f0'
+      default: [255, 255, 255]
+      selector:
+        color_rgb: {}
     titlecontent:
       name: Title Content
       description: The text you want for the title.
@@ -198,8 +183,9 @@ text:
       name: Title Color
       description: Font color for the title.
       required: false
-      default: '#00f'
-      selector: *colors
+      default: [0, 0, 255]
+      selector:
+        color_rgb: {}
     contentid: *contentid
     publishtype: *publishtype
     device_ids: *device_ids
