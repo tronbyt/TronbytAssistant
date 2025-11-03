@@ -268,6 +268,33 @@ async def _async_register_services(
             "Accept": "application/json",
         }
 
+    def _normalize_color(value: Any | None, field: str) -> str | None:
+        """Convert Home Assistant color selector output to hex."""
+        if value is None:
+            return None
+        if isinstance(value, str):
+            return value
+        if isinstance(value, (list, tuple)):
+            if len(value) != 3:
+                raise HomeAssistantError(
+                    f"{field} must contain three RGB values (received {value!r})."
+                )
+            try:
+                r, g, b = map(int, value)
+            except (TypeError, ValueError) as err:
+                raise HomeAssistantError(
+                    f"{field} must contain numeric RGB values."
+                ) from err
+            if not all(0 <= c <= 255 for c in (r, g, b)):
+                raise HomeAssistantError(
+                    f"{field} RGB values must be between 0 and 255 (received {value!r})."
+                )
+            return f"#{r:02x}{g:02x}{b:02x}"
+
+        raise HomeAssistantError(
+            f"{field} must be provided as a hex color string or RGB list."
+        )
+
     async def handle_push_or_text(call: ServiceCall, is_text: bool) -> None:
         contentid = call.data.get(ATTR_CONTENT_ID, DEFAULT_CONTENT_ID)
         publishtype = call.data.get(ATTR_PUBLISH_TYPE)
@@ -280,10 +307,11 @@ async def _async_register_services(
             content = f"text-{texttype}"
             arguments["content"] = call.data.get(ATTR_CONTENT)
             arguments["font"] = call.data.get(ATTR_FONT)
-            arguments["color"] = call.data.get(ATTR_COLOR)
+            arguments["color"] = _normalize_color(call.data.get(ATTR_COLOR), ATTR_COLOR)
             arguments["title"] = call.data.get(ATTR_TITLE_CONTENT, DEFAULT_TITLE)
-            arguments["titlecolor"] = call.data.get(
-                ATTR_TITLE_COLOR, DEFAULT_TITLE_COLOR
+            arguments["titlecolor"] = _normalize_color(
+                call.data.get(ATTR_TITLE_COLOR, DEFAULT_TITLE_COLOR),
+                ATTR_TITLE_COLOR,
             )
             arguments["titlefont"] = call.data.get(ATTR_TITLE_FONT, DEFAULT_TITLE_FONT)
         else:
