@@ -302,7 +302,7 @@ async def _async_register_services(
             return color_rgb_to_hex(r, g, b)
 
         raise HomeAssistantError(
-            f"{field} must be provided as a hex color string or RGB list."
+            f"{field} must be provided as a hex or named color string."
         )
 
     async def handle_push_or_text(call: ServiceCall, is_text: bool) -> None:
