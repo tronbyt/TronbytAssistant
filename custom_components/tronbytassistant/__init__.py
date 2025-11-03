@@ -60,11 +60,10 @@ PLATFORMS: list[Platform] = [
 DATA_CONFIG = "config"
 DATA_SERVICES_REGISTERED = "services_registered"
 
-DEFAULT_TITLE = ""
-DEFAULT_TITLE_FONT = ""
-DEFAULT_ARGS = ""
-DEFAULT_CONTENT_ID = ""
+DEFAULT_PUBLISH_TYPE = "foreground"
 DEFAULT_LANG = "en"
+TEXT_TYPE_REGULAR = "regular"
+TEXT_TYPE_TITLE = "title"
 
 CONFIG_SCHEMA = vol.Schema(
     {
@@ -297,24 +296,27 @@ async def _async_register_services(
         )
 
     async def handle_push_or_text(call: ServiceCall, is_text: bool) -> None:
-        contentid = call.data.get(ATTR_CONTENT_ID, DEFAULT_CONTENT_ID)
-        publishtype = call.data.get(ATTR_PUBLISH_TYPE)
+        contentid = call.data.get(ATTR_CONTENT_ID)
+        publishtype = call.data.get(ATTR_PUBLISH_TYPE, DEFAULT_PUBLISH_TYPE)
         targets = _resolve_devices(call)
 
         arguments: dict[str, Any] = {}
         if is_text:
             contenttype = "builtin"
+            title = call.data.get(ATTR_TITLE_CONTENT)
             texttype = call.data.get(ATTR_TEXT_TYPE)
+            if not texttype:
+                texttype = TEXT_TYPE_TITLE if title else TEXT_TYPE_REGULAR
             content = f"text-{texttype}"
             arguments["content"] = call.data.get(ATTR_CONTENT)
             arguments["font"] = call.data.get(ATTR_FONT)
             arguments["color"] = _normalize_color(call.data.get(ATTR_COLOR), ATTR_COLOR)
-            arguments["title"] = call.data.get(ATTR_TITLE_CONTENT, DEFAULT_TITLE)
+            arguments["title"] = title
             arguments["titlecolor"] = _normalize_color(
                 call.data.get(ATTR_TITLE_COLOR),
                 ATTR_TITLE_COLOR,
             )
-            arguments["titlefont"] = call.data.get(ATTR_TITLE_FONT, DEFAULT_TITLE_FONT)
+            arguments["titlefont"] = call.data.get(ATTR_TITLE_FONT)
             arguments["background_color"] = _normalize_color(
                 call.data.get(ATTR_BACKGROUND_COLOR),
                 ATTR_BACKGROUND_COLOR,
@@ -322,7 +324,7 @@ async def _async_register_services(
             arguments["emoji"] = call.data.get(ATTR_EMOJI)
         else:
             contenttype = call.data.get(ATTR_CONT_TYPE)
-            args = call.data.get(ATTR_ARGS, DEFAULT_ARGS)
+            args = call.data.get(ATTR_ARGS)
             if args != "":
                 parts = args.split(";")
                 for pair in parts:

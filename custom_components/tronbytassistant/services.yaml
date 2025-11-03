@@ -5,7 +5,6 @@ push:
     content:
       name: Content
       description: The content you want displayed on the Tronbyt.
-      required: false
       selector:
         select:
           options:
@@ -40,13 +39,11 @@ push:
     customcontent:
       name: Custom Content
       description: "Type the name of the custom content you want to display. Example: for custom you added 'example.star' to /config/tronbyt then you would type 'example' here."
-      required: false
       selector:
         text: {}
     contenttype:
       name: Content Type
       description: Select between the built-in content or custom content. Custom content should be a .star file placed inside /config/tronbyt.
-      required: true
       default: builtin
       selector:
         select:
@@ -58,13 +55,11 @@ push:
     contentid: &contentid
       name: Content ID
       description: The Content ID you set when publishing your app. Specifying this adds the app to the rotation.
-      required: false
       selector:
         text: {}
     publishtype: &publishtype
       name: Publish Type
       description: How you want content published. Background publishes without replacing the current app and Foreground will publish and also show you the app instantly.
-      required: true
       default: foreground
       selector:
         select:
@@ -76,7 +71,6 @@ push:
     language:
       name: Language
       description: Language to display built-in content.
-      required: false
       default: en
       selector:
         select:
@@ -88,7 +82,6 @@ push:
     arguments:
       name: Arguments
       description: "Arguments you want to send to your .star app. This must be a key=value pair, separated by a semi-colon (;). Example: key=value;key2=value 2;key3=value3"
-      required: false
       selector:
         text: {}
     device_ids: &device_ids
@@ -108,7 +101,6 @@ text:
       name: Text Type
       description: How you want the text displayed.
       default: regular
-      required: true
       selector:
         select:
           options:
@@ -127,7 +119,6 @@ text:
     font:
       name: Font
       description: Font for the text.
-      required: true
       default: tb-8
       selector: &fonts
         select:
@@ -163,40 +154,34 @@ text:
     color:
       name: Color
       description: Font color for the text.
-      required: true
       default: [255, 255, 255]
       selector:
         color_rgb: {}
     titlecontent:
       name: Title Content
       description: The text you want for the title.
-      required: false
       selector:
         text: {}
     titlefont:
       name: Title Font
       description: Font for the title.
-      required: false
       default: 6x13
       selector: *fonts
     titlecolor:
       name: Title Color
       description: Font color for the title.
-      required: false
       default: [0, 0, 255]
       selector:
         color_rgb: {}
     background_color:
       name: Background Color
       description: Background color.
-      required: false
       default: [0, 0, 0]
       selector:
         color_rgb: {}
     emoji:
       name: Emoji
       description: Emoji to render as an icon. Must be a single emoji, and not all are supported.
-      required: false
       selector:
         text: {}
     contentid: *contentid
