@@ -1,0 +1,23 @@
+{
+  "services": {
+    "push": {
+      "service": "mdi:monitor-share",
+      "sections": {
+        "builtin": "mdi:view-grid-plus",
+        "custom": "mdi:file-cog",
+        "advanced": "mdi:tune-variant"
+      }
+    },
+    "text": {
+      "service": "mdi:message-text",
+      "sections": {
+        "text": "mdi:text",
+        "title": "mdi:format-title",
+        "advanced": "mdi:tune-variant"
+      }
+    },
+    "delete": {
+      "service": "mdi:delete"
+    }
+  }
+}
