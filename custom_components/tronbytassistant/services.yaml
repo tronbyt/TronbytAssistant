@@ -53,12 +53,10 @@ push:
           description: Language to display built-in content.
           default: en
           selector:
-            select:
-              options:
-                - label: English
-                  value: en
-                - label: German
-                  value: de
+            language:
+              languages:
+                - en
+                - de
     custom:
       name: Custom
       collapsed: true
