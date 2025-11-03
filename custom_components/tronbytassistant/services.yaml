@@ -11,17 +11,6 @@ push:
           multiple: true
           filter:
             - integration: tronbytassistant
-    contenttype:
-      name: Content Type
-      description: Select between the built-in content or custom content. Custom content should be a .star file placed inside /config/tronbyt.
-      default: builtin
-      selector:
-        select:
-          options:
-            - label: Built-In
-              value: builtin
-            - label: Custom
-              value: custom
     builtin:
       name: Built-In
       fields:
@@ -89,6 +78,16 @@ push:
       name: Advanced
       collapsed: true
       fields:
+        contenttype:
+          name: Content Type
+          description: Select between the built-in content or custom content. Custom content should be a .star file placed inside /config/tronbyt.
+          selector:
+            select:
+              options:
+                - label: Built-In
+                  value: builtin
+                - label: Custom
+                  value: custom
         contentid: &contentid
           name: Content ID
           description: The Content ID you set when publishing your app. Specifying this adds the app to the rotation.
@@ -198,7 +197,6 @@ text:
         texttype:
           name: Text Type
           description: How you want the text displayed.
-          default: regular
           selector:
             select:
               options:
