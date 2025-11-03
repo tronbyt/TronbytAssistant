@@ -42,7 +42,7 @@ push:
       description: "Type the name of the custom content you want to display. Example: for custom you added 'example.star' to /config/tronbyt then you would type 'example' here."
       required: false
       selector:
-        text: null
+        text: {}
     contenttype:
       name: Content Type
       description: Select between the built-in content or custom content. Custom content should be a .star file placed inside /config/tronbyt.
@@ -60,7 +60,7 @@ push:
       description: The Content ID you set when publishing your app. Specifying this adds the app to the rotation.
       required: false
       selector:
-        text: null
+        text: {}
     publishtype: &publishtype
       name: Publish Type
       description: How you want content published. Background publishes without replacing the current app and Foreground will publish and also show you the app instantly.
@@ -90,7 +90,7 @@ push:
       description: "Arguments you want to send to your .star app. This must be a key=value pair, separated by a semi-colon (;). Example: key=value;key2=value 2;key3=value3"
       required: false
       selector:
-        text: null
+        text: {}
     device_ids: &device_ids
       name: Devices
       description: Select the Tronbyt displays you want to target.
@@ -123,7 +123,7 @@ text:
       description: The text you want displayed.
       required: true
       selector:
-        text: null
+        text: {}
     font:
       name: Font
       description: Font for the text.
@@ -172,7 +172,7 @@ text:
       description: The text you want for the title.
       required: false
       selector:
-        text: null
+        text: {}
     titlefont:
       name: Title Font
       description: Font for the title.
@@ -211,5 +211,5 @@ delete:
       description: The Content ID you set when publishing your app.
       required: true
       selector:
-        text: null
+        text: {}
     device_ids: *device_ids
