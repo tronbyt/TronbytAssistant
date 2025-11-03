@@ -21,6 +21,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.util.color import color_rgb_to_hex, color_name_to_rgb
 
 from .const import (
     ATTR_ARGS,
@@ -275,7 +276,14 @@ async def _async_register_services(
         if value is None:
             return None
         if isinstance(value, str):
-            return value
+            if value.startswith("#") and len(value) in (4, 7):
+                return value
+            try:
+                value = color_name_to_rgb(value)
+            except ValueError as err:
+                raise HomeAssistantError(
+                    f"{field} contains an unknown color name (received {value!r})."
+                ) from err
         if isinstance(value, (list, tuple)):
             if len(value) != 3:
                 raise HomeAssistantError(
@@ -291,7 +299,7 @@ async def _async_register_services(
                 raise HomeAssistantError(
                     f"{field} RGB values must be between 0 and 255 (received {value!r})."
                 )
-            return f"#{r:02x}{g:02x}{b:02x}"
+            return color_rgb_to_hex(r, g, b)
 
         raise HomeAssistantError(
             f"{field} must be provided as a hex color string or RGB list."
