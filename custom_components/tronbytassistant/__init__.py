@@ -64,6 +64,8 @@ DEFAULT_PUBLISH_TYPE = "foreground"
 DEFAULT_LANG = "en"
 TEXT_TYPE_REGULAR = "regular"
 TEXT_TYPE_TITLE = "title"
+CONTENT_TYPE_BUILT_IN = "builtin"
+CONTENT_TYPE_CUSTOM = "custom"
 
 CONFIG_SCHEMA = vol.Schema(
     {
@@ -302,7 +304,6 @@ async def _async_register_services(
 
         arguments: dict[str, Any] = {}
         if is_text:
-            contenttype = "builtin"
             title = call.data.get(ATTR_TITLE_CONTENT)
             texttype = call.data.get(ATTR_TEXT_TYPE)
             if not texttype:
@@ -324,27 +325,32 @@ async def _async_register_services(
             arguments["emoji"] = call.data.get(ATTR_EMOJI)
         else:
             contenttype = call.data.get(ATTR_CONT_TYPE)
-            args = call.data.get(ATTR_ARGS)
-            if args != "":
-                parts = args.split(";")
-                for pair in parts:
-                    if not pair:
-                        continue
-                    if "=" not in pair:
-                        raise HomeAssistantError(
-                            "Arguments must be provided as key=value pairs separated by ';'"
-                        )
-                    key, value = pair.split("=", maxsplit=1)
-                    arguments[key] = value
+            custom_content = call.data.get(ATTR_CUSTOM_CONT)
+            if not contenttype:
+                contenttype = (
+                    CONTENT_TYPE_CUSTOM if custom_content else CONTENT_TYPE_BUILT_IN
+                )
 
-            match contenttype:
-                case "builtin":
-                    content = call.data.get(ATTR_CONTENT)
-                    arguments["lang"] = call.data.get(ATTR_LANG, DEFAULT_LANG)
-                case "custom":
-                    content = call.data.get(ATTR_CUSTOM_CONT)
-                case _:
-                    raise HomeAssistantError(f"Unsupported content type: {contenttype}")
+            if contenttype == CONTENT_TYPE_BUILT_IN:
+                content = call.data.get(ATTR_CONTENT)
+                arguments["lang"] = call.data.get(ATTR_LANG, DEFAULT_LANG)
+            elif contenttype == CONTENT_TYPE_CUSTOM:
+                content = custom_content
+
+                args = call.data.get(ATTR_ARGS)
+                if args:
+                    parts = args.split(";")
+                    for pair in parts:
+                        if not pair:
+                            continue
+                        if "=" not in pair:
+                            raise HomeAssistantError(
+                                "Arguments must be provided as key=value pairs separated by ';'"
+                            )
+                        key, value = pair.split("=", maxsplit=1)
+                        arguments[key] = value
+            else:
+                raise HomeAssistantError(f"Unsupported content type: {contenttype}")
 
         refresh_needed = False
         for item in targets:
