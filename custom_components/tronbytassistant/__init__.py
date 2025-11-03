@@ -43,6 +43,8 @@ from .const import (
     CONF_VERIFY_SSL,
     DATA_COORDINATOR,
     DOMAIN,
+    ATTR_BACKGROUND_COLOR,
+    ATTR_EMOJI,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -59,7 +61,6 @@ DATA_CONFIG = "config"
 DATA_SERVICES_REGISTERED = "services_registered"
 
 DEFAULT_TITLE = ""
-DEFAULT_TITLE_COLOR = ""
 DEFAULT_TITLE_FONT = ""
 DEFAULT_ARGS = ""
 DEFAULT_CONTENT_ID = ""
@@ -310,10 +311,15 @@ async def _async_register_services(
             arguments["color"] = _normalize_color(call.data.get(ATTR_COLOR), ATTR_COLOR)
             arguments["title"] = call.data.get(ATTR_TITLE_CONTENT, DEFAULT_TITLE)
             arguments["titlecolor"] = _normalize_color(
-                call.data.get(ATTR_TITLE_COLOR, DEFAULT_TITLE_COLOR),
+                call.data.get(ATTR_TITLE_COLOR),
                 ATTR_TITLE_COLOR,
             )
             arguments["titlefont"] = call.data.get(ATTR_TITLE_FONT, DEFAULT_TITLE_FONT)
+            arguments["background_color"] = _normalize_color(
+                call.data.get(ATTR_BACKGROUND_COLOR),
+                ATTR_BACKGROUND_COLOR,
+            )
+            arguments["emoji"] = call.data.get(ATTR_EMOJI)
         else:
             contenttype = call.data.get(ATTR_CONT_TYPE)
             args = call.data.get(ATTR_ARGS, DEFAULT_ARGS)
