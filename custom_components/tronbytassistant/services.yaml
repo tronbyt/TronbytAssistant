@@ -186,6 +186,19 @@ text:
       default: [0, 0, 255]
       selector:
         color_rgb: {}
+    background_color:
+      name: Background Color
+      description: Background color.
+      required: false
+      default: [0, 0, 0]
+      selector:
+        color_rgb: {}
+    emoji:
+      name: Emoji
+      description: Emoji to render as an icon. Must be a single emoji, and not all are supported.
+      required: false
+      selector:
+        text: {}
     contentid: *contentid
     publishtype: *publishtype
     device_ids: *device_ids
