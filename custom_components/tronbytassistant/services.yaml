@@ -2,45 +2,15 @@ push:
   name: Push
   description: Push content to Tronbyt device.
   fields:
-    content:
-      name: Content
-      description: The content you want displayed on the Tronbyt.
+    device_ids: &device_ids
+      name: Devices
+      description: Select the Tronbyt displays you want to target.
+      required: true
       selector:
-        select:
-          options:
-            - label: Coffee
-              value: coffee
-            - label: Dishwasher
-              value: dishwasher
-            - label: Doorbell
-              value: doorbell
-            - label: Dryer
-              value: dryer
-            - label: Filters
-              value: filters
-            - label: Fridge
-              value: fridge
-            - label: Garage Closed
-              value: garageclosed
-            - label: Garage Closing
-              value: garageclosing
-            - label: Garage Open
-              value: garageopen
-            - label: Trash
-              value: trash
-            - label: Trash Bins Out
-              value: trashbinsout
-            - label: Trash and Recycling
-              value: trashrecycle
-            - label: Trash and Recycling Bins Out
-              value: trashrecbinsout
-            - label: Washer
-              value: washer
-    customcontent:
-      name: Custom Content
-      description: "Type the name of the custom content you want to display. Example: for custom you added 'example.star' to /config/tronbyt then you would type 'example' here."
-      selector:
-        text: {}
+        device:
+          multiple: true
+          filter:
+            - integration: tronbytassistant
     contenttype:
       name: Content Type
       description: Select between the built-in content or custom content. Custom content should be a .star file placed inside /config/tronbyt.
@@ -52,127 +22,163 @@ push:
               value: builtin
             - label: Custom
               value: custom
-    contentid: &contentid
-      name: Content ID
-      description: The Content ID you set when publishing your app. Specifying this adds the app to the rotation.
-      selector:
-        text: {}
-    publishtype: &publishtype
-      name: Publish Type
-      description: How you want content published. Background publishes without replacing the current app and Foreground will publish and also show you the app instantly.
-      default: foreground
-      selector:
-        select:
-          options:
-            - label: Foreground
-              value: foreground
-            - label: Background
-              value: background
-    language:
-      name: Language
-      description: Language to display built-in content.
-      default: en
-      selector:
-        select:
-          options:
-            - label: English
-              value: en
-            - label: German
-              value: de
-    arguments:
-      name: Arguments
-      description: "Arguments you want to send to your .star app. This must be a key=value pair, separated by a semi-colon (;). Example: key=value;key2=value 2;key3=value3"
-      selector:
-        text: {}
-    device_ids: &device_ids
-      name: Devices
-      description: Select the Tronbyt displays you want to target.
-      required: true
-      selector:
-        device:
-          multiple: true
-          filter:
-            - integration: tronbytassistant
+    builtin:
+      name: Built-In
+      fields:
+        content:
+          name: Content
+          description: The content you want displayed on the Tronbyt.
+          selector:
+            select:
+              options:
+                - label: Coffee
+                  value: coffee
+                - label: Dishwasher
+                  value: dishwasher
+                - label: Doorbell
+                  value: doorbell
+                - label: Dryer
+                  value: dryer
+                - label: Filters
+                  value: filters
+                - label: Fridge
+                  value: fridge
+                - label: Garage Closed
+                  value: garageclosed
+                - label: Garage Closing
+                  value: garageclosing
+                - label: Garage Open
+                  value: garageopen
+                - label: Trash
+                  value: trash
+                - label: Trash Bins Out
+                  value: trashbinsout
+                - label: Trash and Recycling
+                  value: trashrecycle
+                - label: Trash and Recycling Bins Out
+                  value: trashrecbinsout
+                - label: Washer
+                  value: washer
+        language:
+          name: Language
+          description: Language to display built-in content.
+          default: en
+          selector:
+            select:
+              options:
+                - label: English
+                  value: en
+                - label: German
+                  value: de
+    custom:
+      name: Custom
+      collapsed: true
+      fields:
+        customcontent:
+          name: Custom Content
+          description: "Type the name of the custom content you want to display. Example: for custom you added 'example.star' to /config/tronbyt then you would type 'example' here."
+          selector:
+            text: {}
+        arguments:
+          name: Arguments
+          description: "Arguments you want to send to your .star app. This must be a key=value pair, separated by a semi-colon (;). Example: key=value;key2=value 2;key3=value3"
+          selector:
+            text: {}
+    advanced:
+      name: Advanced
+      collapsed: true
+      fields:
+        contentid: &contentid
+          name: Content ID
+          description: The Content ID you set when publishing your app. Specifying this adds the app to the rotation.
+          selector:
+            text: {}
+        publishtype: &publishtype
+          name: Publish Type
+          description: How you want content published. Background publishes without replacing the current app and Foreground will publish and also show you the app instantly.
+          default: foreground
+          selector:
+            select:
+              options:
+                - label: Foreground
+                  value: foreground
+                - label: Background
+                  value: background
 text:
   name: Text
   description: Push custom text to a Tronbyt device.
   fields:
-    texttype:
-      name: Text Type
-      description: How you want the text displayed.
-      default: regular
-      selector:
-        select:
-          options:
-            - label: Regular
-              value: regular
-            - label: Scrolling
-              value: scrolling
-            - label: Title & Text
-              value: title
-    content:
-      name: Content
-      description: The text you want displayed.
-      required: true
-      selector:
-        text: {}
-    font:
-      name: Font
-      description: Font for the text.
-      default: tb-8
-      selector: &fonts
-        select:
-          options:
-            - tb-8
-            - Dina_r400-6
-            - 5x8
-            - 10x20
-            - tom-thumb
-            - CG-pixel-3x5-mono
-            - CG-pixel-4x5-mono
-            - 6x10
-            - 6x10-rounded
-            - 6x13
-            - terminus-12
-            - terminus-12-light
-            - terminus-14
-            - terminus-14-light
-            - terminus-16
-            - terminus-16-light
-            - terminus-18
-            - terminus-18-light
-            - terminus-20
-            - terminus-20-light
-            - terminus-22
-            - terminus-22-light
-            - terminus-24
-            - terminus-24-light
-            - terminus-28
-            - terminus-28-light
-            - terminus-32
-            - terminus-32-light
-    color:
-      name: Color
-      description: Font color for the text.
-      default: [255, 255, 255]
-      selector:
-        color_rgb: {}
-    titlecontent:
-      name: Title Content
-      description: The text you want for the title.
-      selector:
-        text: {}
-    titlefont:
-      name: Title Font
-      description: Font for the title.
-      default: 6x13
-      selector: *fonts
-    titlecolor:
-      name: Title Color
-      description: Font color for the title.
-      default: [0, 0, 255]
-      selector:
-        color_rgb: {}
+    device_ids: *device_ids
+    text:
+      name: Text
+      fields:
+        content:
+          name: Content
+          description: The text you want displayed.
+          required: true
+          selector:
+            text: {}
+        font:
+          name: Font
+          description: Font for the text.
+          default: tb-8
+          selector: &fonts
+            select:
+              options:
+                - tb-8
+                - Dina_r400-6
+                - 5x8
+                - 10x20
+                - tom-thumb
+                - CG-pixel-3x5-mono
+                - CG-pixel-4x5-mono
+                - 6x10
+                - 6x10-rounded
+                - 6x13
+                - terminus-12
+                - terminus-12-light
+                - terminus-14
+                - terminus-14-light
+                - terminus-16
+                - terminus-16-light
+                - terminus-18
+                - terminus-18-light
+                - terminus-20
+                - terminus-20-light
+                - terminus-22
+                - terminus-22-light
+                - terminus-24
+                - terminus-24-light
+                - terminus-28
+                - terminus-28-light
+                - terminus-32
+                - terminus-32-light
+        color:
+          name: Color
+          description: Font color for the text.
+          default: [255, 255, 255]
+          selector:
+            color_rgb: {}
+    title:
+      name: Title
+      collapsed: true
+      fields:
+        titlecontent:
+          name: Title Content
+          description: The text you want for the title.
+          selector:
+            text: {}
+        titlefont:
+          name: Title Font
+          description: Font for the title.
+          default: 6x13
+          selector: *fonts
+        titlecolor:
+          name: Title Color
+          description: Font color for the title.
+          default: [0, 0, 255]
+          selector:
+            color_rgb: {}
     background_color:
       name: Background Color
       description: Background color.
@@ -184,17 +190,33 @@ text:
       description: Emoji to render as an icon. Must be a single emoji, and not all are supported.
       selector:
         text: {}
-    contentid: *contentid
-    publishtype: *publishtype
-    device_ids: *device_ids
+    advanced:
+      name: Advanced
+      collapsed: true
+      fields:
+        texttype:
+          name: Text Type
+          description: How you want the text displayed.
+          default: regular
+          selector:
+            select:
+              options:
+                - label: Regular
+                  value: regular
+                - label: Scrolling
+                  value: scrolling
+                - label: Title & Text
+                  value: title
+        contentid: *contentid
+        publishtype: *publishtype
 delete:
   name: Delete
   description: Delete an app from the rotation.
   fields:
+    device_ids: *device_ids
     contentid:
       name: Content ID
       description: The Content ID you set when publishing your app.
       required: true
       selector:
         text: {}
-    device_ids: *device_ids
