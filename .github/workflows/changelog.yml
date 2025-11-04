@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -24,31 +24,31 @@ jobs:
         run: |
           # Get commits since last changelog commit (excluding changelog update commits)
           LAST_CHANGELOG_COMMIT=$(git log --oneline --grep="update changelog" --grep="chore: update changelog" --invert-grep -1 --format="%H" || git rev-list --max-parents=0 HEAD)
-          
+
           echo "Checking commits since: $LAST_CHANGELOG_COMMIT"
-          
+
           # Get new commits (excluding this potential changelog commit)
           COMMITS=$(git log --pretty=format:"%s" $LAST_CHANGELOG_COMMIT..HEAD --grep="update changelog" --grep="chore: update changelog" --invert-grep)
-          
+
           if [ -z "$COMMITS" ]; then
             echo "No new commits found"
             echo "has_changes=false" >> $GITHUB_OUTPUT
             exit 0
           fi
-          
+
           echo "has_changes=true" >> $GITHUB_OUTPUT
-          
+
           # Initialize changelog sections
           ADDED=""
           FIXED=""
           CHANGED=""
           REMOVED=""
           SECURITY=""
-          
+
           # Process each commit
           while IFS= read -r commit; do
             echo "Processing: $commit"
-            
+
             case "$commit" in
               feat:*|feat\(*\):*)
                 item=$(echo "$commit" | sed 's/^feat[^:]*: *//')
@@ -84,7 +84,7 @@ jobs:
                 ;;
             esac
           done <<< "$COMMITS"
-          
+
           # Save sections to files for later use
           echo -e "$ADDED" > /tmp/added.txt
           echo -e "$FIXED" > /tmp/fixed.txt
@@ -99,46 +99,46 @@ jobs:
           FIXED=$(cat /tmp/fixed.txt)
           CHANGED=$(cat /tmp/changed.txt)
           REMOVED=$(cat /tmp/removed.txt)
-          
+
           # Create new unreleased section
           NEW_SECTION=""
-          
+
           if [ ! -z "$ADDED" ] && [ "$ADDED" != "-" ]; then
             NEW_SECTION="${NEW_SECTION}\n### Added\n${ADDED}"
           fi
-          
+
           if [ ! -z "$FIXED" ] && [ "$FIXED" != "-" ]; then
             NEW_SECTION="${NEW_SECTION}\n### Fixed\n${FIXED}"
           fi
-          
+
           if [ ! -z "$CHANGED" ] && [ "$CHANGED" != "-" ]; then
             NEW_SECTION="${NEW_SECTION}\n### Changed\n${CHANGED}"
           fi
-          
+
           if [ ! -z "$REMOVED" ] && [ "$REMOVED" != "-" ]; then
             NEW_SECTION="${NEW_SECTION}\n### Removed\n${REMOVED}"
           fi
-          
+
           # Only update if we have actual content
           if [ ! -z "$NEW_SECTION" ]; then
             # Create backup
             cp CHANGELOG.md CHANGELOG.md.bak
-            
+
             # Create new changelog
             {
               # Keep everything before [Unreleased]
               sed '/^## \[Unreleased\]/,$d' CHANGELOG.md
-              
+
               # Add new [Unreleased] section
               echo "## [Unreleased]"
               echo -e "$NEW_SECTION"
-              
+
               # Add rest of changelog (skip old [Unreleased] section)
               sed -n '/^## \[Unreleased\]/,/^## \[/{/^## \[Unreleased\]/d; /^## \[/!d;}; /^## \[/,$p' CHANGELOG.md
             } > CHANGELOG.new.md
-            
+
             mv CHANGELOG.new.md CHANGELOG.md
-            
+
             echo "Changelog updated successfully"
           else
             echo "No conventional commits to add to changelog"
@@ -153,7 +153,7 @@ jobs:
           else
             echo "CHANGELOG.md has been updated"
             echo "changes=true" >> $GITHUB_OUTPUT
-            
+
             echo "## Changes made:" >> $GITHUB_STEP_SUMMARY
             echo '```diff' >> $GITHUB_STEP_SUMMARY
             git diff CHANGELOG.md >> $GITHUB_STEP_SUMMARY
