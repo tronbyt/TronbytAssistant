@@ -119,7 +119,6 @@ text:
         font:
           name: Font
           description: Font for the text.
-          default: tb-8
           selector: &fonts
             select:
               options:
@@ -154,7 +153,6 @@ text:
         color:
           name: Color
           description: Font color for the text.
-          default: "#fff"
           selector:
             text:
               type: color
@@ -170,19 +168,16 @@ text:
         titlefont:
           name: Title Font
           description: Font for the title.
-          default: 6x13
           selector: *fonts
         titlecolor:
           name: Title Color
           description: Font color for the title.
-          default: "#00f"
           selector:
             text:
               type: color
     background_color:
       name: Background Color
       description: Background color.
-      default: "#000"
       selector:
         text:
           type: color
