@@ -38,6 +38,8 @@ push:
                   value: garageclosing
                 - label: Garage Open
                   value: garageopen
+                - label: Garage Opening
+                  value: garageopening
                 - label: Trash
                   value: trash
                 - label: Trash Bins Out
