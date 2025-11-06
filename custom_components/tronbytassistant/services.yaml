@@ -117,7 +117,8 @@ text:
           description: The text you want displayed.
           required: true
           selector:
-            text: {}
+            text:
+              multiline: true
         font:
           name: Font
           description: Font for the text.
@@ -166,7 +167,8 @@ text:
           name: Title Content
           description: The text you want for the title.
           selector:
-            text: {}
+            text:
+              multiline: true
         titlefont:
           name: Title Font
           description: Font for the title.
