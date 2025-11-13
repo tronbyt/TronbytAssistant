@@ -11,6 +11,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.helpers.entity import EntityCategory
 
 from .const import DATA_COORDINATOR, DOMAIN
+from .device import build_device_info
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -79,15 +80,7 @@ class TronbytNightModeSwitch(CoordinatorEntity, SwitchEntity):
 
     @property
     def device_info(self) -> dict[str, Any]:
-        device = self._device() or {}
-        model = device.get("type") or "Display"
-        name = device.get("name", self._deviceid)
-        return {
-            "identifiers": {(DOMAIN, self._deviceid)},
-            "name": name,
-            "manufacturer": "Tronbyt",
-            "model": model,
-        }
+        return build_device_info(self._device(), self._deviceid)
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         await self._async_set_night_mode(True)
@@ -176,12 +169,4 @@ class TronbytInstallationSwitch(CoordinatorEntity, SwitchEntity):
 
     @property
     def device_info(self) -> dict[str, Any]:
-        device = self._device() or {}
-        model = device.get("type") or "Display"
-        name = device.get("name", self._deviceid)
-        return {
-            "identifiers": {(DOMAIN, self._deviceid)},
-            "name": name,
-            "manufacturer": "Tronbyt",
-            "model": model,
-        }
+        return build_device_info(self._device(), self._deviceid)

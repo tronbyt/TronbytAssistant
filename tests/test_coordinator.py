@@ -104,6 +104,14 @@ async def test_coordinator_fetches_devices_with_installations(hass: HomeAssistan
                         },
                         "dimMode": {"startTime": "07:00", "brightness": 10},
                         "pinnedApp": "123",
+                        "autoDim": False,
+                        "info": {
+                            "firmwareVersion": "v1.0.0",
+                            "firmwareType": "ESP32",
+                            "protocolVersion": 1,
+                            "protocolType": "WS",
+                            "macAddress": "aa:bb:cc:dd:ee:ff",
+                        },
                     }
                 ]
             },
@@ -124,6 +132,8 @@ async def test_coordinator_fetches_devices_with_installations(hass: HomeAssistan
     assert device["interval"] == 120
     assert device["night_mode"]["app"] == "123"
     assert device["installations"] == [{"id": "inst1", "enabled": True}]
+    assert device["info"]["firmware_version"] == "v1.0.0"
+    assert device["info"]["mac_address"] == "aa:bb:cc:dd:ee:ff"
     coordinator._async_fetch_installations.assert_awaited_once()
 
 
@@ -200,6 +210,11 @@ async def test_async_patch_device_updates_local_state(hass: HomeAssistant):
                 "nightMode": {"enabled": True, "app": "999", "startTime": "20:00"},
                 "dimMode": {"startTime": "07:00", "brightness": 12},
                 "pinnedApp": "999",
+                "info": {
+                    "firmwareVersion": "2.0.0",
+                    "firmwareType": "ESP32-S3",
+                    "macAddress": "bb:cc:dd:ee:ff:00",
+                },
             },
         ),
     )
@@ -311,6 +326,10 @@ def test_merge_device_update_overwrites_fields(hass: HomeAssistant):
             "pinned_app": None,
             "auto_dim": False,
             "installations": [],
+            "info": {
+                "firmware_version": "old",
+                "mac_address": "aa:bb",
+            },
         }
     ]
 
@@ -326,6 +345,11 @@ def test_merge_device_update_overwrites_fields(hass: HomeAssistant):
             "nightMode": {"enabled": True, "app": "abc"},
             "dimMode": {"startTime": "20:00", "brightness": 5},
             "pinnedApp": "abc",
+            "info": {
+                "firmwareVersion": "3.0.0",
+                "firmwareType": "ESP32",
+                "macAddress": "11:22",
+            },
         },
         [{"id": "inst1"}],
     )
@@ -335,6 +359,7 @@ def test_merge_device_update_overwrites_fields(hass: HomeAssistant):
     assert updated["night_mode"]["app"] == "abc"
     assert updated["dim_mode"]["start"] == "20:00"
     assert updated["installations"] == [{"id": "inst1"}]
+    assert updated["info"]["firmware_version"] == "3.0.0"
 
 
 def test_merge_installation_update_adds_new(hass: HomeAssistant):
