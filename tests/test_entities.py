@@ -7,6 +7,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC
+
 from custom_components.tronbytassistant import light as light_mod
 from custom_components.tronbytassistant import number as number_mod
 from custom_components.tronbytassistant import select as select_mod
@@ -36,6 +38,13 @@ def device_payload() -> dict[str, Any]:
         "dim_mode": {"start": "10:00", "brightness": 30},
         "pinned_app": "217",
         "auto_dim": False,
+        "info": {
+            "firmware_version": "1.2.3",
+            "firmware_type": "ESP32",
+            "protocol_version": 1,
+            "protocol_type": "WS",
+            "mac_address": "cc:dd:ee:ff:00:11",
+        },
         "installations": [
             {"id": "477", "appID": "Custom Clock", "enabled": True},
             {"id": "217", "appID": "Weather", "enabled": False},
@@ -109,6 +118,11 @@ def test_number_native_value_and_device_info(coordinator: TronbytCoordinator):
     info = entity.device_info
     assert info["identifiers"] == {(DOMAIN, "dev1")}
     assert info["model"] == "Model X"
+    assert info["sw_version"] == "1.2.3"
+    assert info["hw_version"] == "ESP32"
+    assert info["connections"] == {
+        (CONNECTION_NETWORK_MAC, "cc:dd:ee:ff:00:11"),
+    }
 
 
 @pytest.mark.asyncio
@@ -129,6 +143,7 @@ def test_time_entity_native_value_and_device_info(coordinator: TronbytCoordinato
     assert entity.native_value == time_obj(21, 0, 0)
     info = entity.device_info
     assert info["name"] == "Living Room"
+    assert info["sw_version"] == "1.2.3"
 
 
 @pytest.mark.asyncio

@@ -542,31 +542,7 @@ class TronbytCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
             if not device_id:
                 continue
 
-            night = item.get("nightMode") or {}
-            dim = item.get("dimMode") or {}
-
-            devices.append(
-                {
-                    "id": device_id,
-                    "name": item.get("displayName") or device_id,
-                    "type": item.get("type"),
-                    "notes": item.get("notes"),
-                    "interval": item.get("intervalSec"),
-                    "brightness": item.get("brightness"),
-                    "night_mode": {
-                        "enabled": night.get("enabled"),
-                        "app": night.get("app"),
-                        "start": night.get("startTime"),
-                        "end": night.get("endTime"),
-                        "brightness": night.get("brightness"),
-                    },
-                    "dim_mode": {
-                        "start": dim.get("startTime"),
-                        "brightness": dim.get("brightness"),
-                    },
-                    "pinned_app": item.get("pinnedApp"),
-                }
-            )
+            devices.append(self._normalize_device_payload(item))
             install_tasks.append(self._async_fetch_installations(session, device_id))
 
         if not devices:
@@ -662,33 +638,51 @@ class TronbytCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
             if device.get("id") != deviceid:
                 continue
 
-            night = device_payload.get("nightMode") or {}
-            dim = device_payload.get("dimMode") or {}
-
-            updated = {
-                "id": deviceid,
-                "name": device_payload.get("displayName") or deviceid,
-                "type": device_payload.get("type"),
-                "notes": device_payload.get("notes"),
-                "interval": device_payload.get("intervalSec"),
-                "brightness": device_payload.get("brightness"),
-                "night_mode": {
-                    "enabled": night.get("enabled"),
-                    "app": night.get("app"),
-                    "start": night.get("startTime"),
-                    "end": night.get("endTime"),
-                    "brightness": night.get("brightness"),
-                },
-                "dim_mode": {
-                    "start": dim.get("startTime"),
-                    "brightness": dim.get("brightness"),
-                },
-                "pinned_app": device_payload.get("pinnedApp"),
-                "installations": installations,
-            }
+            updated = self._normalize_device_payload(device_payload, installations)
 
             self.data[idx] = updated
             break
+
+    def _normalize_device_payload(
+        self,
+        payload: dict[str, Any],
+        installations: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
+        night = payload.get("nightMode") or {}
+        dim = payload.get("dimMode") or {}
+        info = payload.get("info") or {}
+
+        return {
+            "id": payload.get("id"),
+            "name": payload.get("displayName")
+            or payload.get("name")
+            or payload.get("id"),
+            "type": payload.get("type"),
+            "notes": payload.get("notes"),
+            "interval": payload.get("intervalSec"),
+            "brightness": payload.get("brightness"),
+            "night_mode": {
+                "enabled": night.get("enabled"),
+                "app": night.get("app"),
+                "start": night.get("startTime"),
+                "end": night.get("endTime"),
+                "brightness": night.get("brightness"),
+            },
+            "dim_mode": {
+                "start": dim.get("startTime"),
+                "brightness": dim.get("brightness"),
+            },
+            "pinned_app": payload.get("pinnedApp"),
+            "auto_dim": payload.get("autoDim"),
+            "info": {
+                "firmware_version": info.get("firmwareVersion"),
+                "firmware_type": info.get("firmwareType"),
+                "protocol_version": info.get("protocolVersion"),
+                "protocol_type": info.get("protocolType"),
+                "mac_address": info.get("macAddress"),
+            },
+            "installations": installations if installations is not None else [],
+        }
 
     def _merge_installation_update(
         self, deviceid: str, installation_payload: dict[str, Any]

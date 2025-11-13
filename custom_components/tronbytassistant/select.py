@@ -11,6 +11,7 @@ from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DATA_COORDINATOR, DOMAIN
+from .device import build_device_info
 
 NONE_OPTION = "none"
 
@@ -167,12 +168,4 @@ class TronbytSelect(CoordinatorEntity, SelectEntity):
 
     @property
     def device_info(self) -> dict[str, Any]:
-        device = self._device() or {}
-        model = device.get("type") or "Display"
-        name = device.get("name", self._deviceid)
-        return {
-            "identifiers": {(DOMAIN, self._deviceid)},
-            "name": name,
-            "manufacturer": "Tronbyt",
-            "model": model,
-        }
+        return build_device_info(self._device(), self._deviceid)
