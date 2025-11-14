@@ -71,3 +71,14 @@ This example has a varible "who", which can be used as the **key=value** pair **
 
 # Troubleshooting
 The action should do a few checks when you run it and give feedback on what went wrong. If you need deeper details, check the logs on your Tronbyt server as well as Home Assistant's logs for HTTP errors.
+
+# Contributing
+
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on:
+- Conventional commit format for automatic changelog generation
+- Development setup
+- Pull request process
+
+## Changelog
+
+This project maintains a changelog in [CHANGELOG.md](CHANGELOG.md) that is automatically updated based on conventional commits. When you create commits following the conventional format, they will automatically appear in the changelog when pushed to the main branch.
