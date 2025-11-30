@@ -50,15 +50,6 @@ push:
                   value: trashrecbinsout
                 - label: Washer
                   value: washer
-        language:
-          name: Language
-          description: Language to display built-in content.
-          default: en
-          selector:
-            language:
-              languages:
-                - en
-                - de
     custom:
       name: Custom
       collapsed: true

@@ -33,7 +33,6 @@ from .const import (
     ATTR_DEVICENANME,
     ATTR_DEVICE_IDS,
     ATTR_FONT,
-    ATTR_LANG,
     ATTR_PUBLISH_TYPE,
     ATTR_TEXT_TYPE,
     ATTR_TITLE_COLOR,
@@ -62,7 +61,6 @@ DATA_CONFIG = "config"
 DATA_SERVICES_REGISTERED = "services_registered"
 
 DEFAULT_PUBLISH_TYPE = "foreground"
-DEFAULT_LANG = "en"
 TEXT_TYPE_REGULAR = "regular"
 TEXT_TYPE_TITLE = "title"
 CONTENT_TYPE_BUILT_IN = "builtin"
@@ -341,7 +339,6 @@ async def _async_register_services(
 
             if contenttype == CONTENT_TYPE_BUILT_IN:
                 content = call.data.get(ATTR_CONTENT)
-                arguments["lang"] = call.data.get(ATTR_LANG, DEFAULT_LANG)
             elif contenttype == CONTENT_TYPE_CUSTOM:
                 content = custom_content
 
