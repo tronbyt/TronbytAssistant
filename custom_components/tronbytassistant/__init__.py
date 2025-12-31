@@ -341,10 +341,12 @@ async def _async_register_services(
                 content = call.data.get(ATTR_CONTENT)
             elif contenttype == CONTENT_TYPE_CUSTOM:
                 content = custom_content
+            else:
+                raise HomeAssistantError(f"Unsupported content type: {contenttype}")
 
-                args = call.data.get(ATTR_ARGS)
-                if isinstance(args, str):
-                    args = args.split(";")
+            args = call.data.get(ATTR_ARGS)
+            if isinstance(args, str):
+                args = args.split(";")
                 for pair in args:
                     if not pair:
                         continue
@@ -354,8 +356,6 @@ async def _async_register_services(
                         )
                     key, value = pair.split("=", maxsplit=1)
                     arguments[key] = value
-            else:
-                raise HomeAssistantError(f"Unsupported content type: {contenttype}")
 
         refresh_needed = False
         for item in targets:
