@@ -46,6 +46,34 @@ SELECT_DESCRIPTIONS: tuple[TronbytSelectDescription, ...] = (
 )
 
 
+@dataclass(frozen=True)
+class TronbytConfigSelectDescription:
+    key: str
+    translation_key: str | None
+    icon: str | None
+    value_fn: Callable[[dict[str, Any]], int | None]
+    patch_key: str
+    options: dict[str, int]
+    entity_registry_enabled_default: bool = True
+    entity_category: EntityCategory | None = EntityCategory.CONFIG
+
+
+CONFIG_SELECT_DESCRIPTIONS: tuple[TronbytConfigSelectDescription, ...] = (
+    TronbytConfigSelectDescription(
+        key="wifi_power_save",
+        translation_key="wifi_power_save",
+        icon="mdi:wifi-cog",
+        value_fn=lambda device: (device.get("info") or {}).get("wifi_power_save"),
+        patch_key="wifiPowerSave",
+        options={
+            "off": 0,
+            "min": 1,
+            "max": 2,
+        },
+    ),
+)
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -55,13 +83,20 @@ async def async_setup_entry(
     if coordinator is None or not coordinator.data:
         return
 
-    entities: list[TronbytSelect] = []
+    entities: list[SelectEntity] = []
     for description in SELECT_DESCRIPTIONS:
         for device in coordinator.data:
             device_id = device.get("id")
             if device_id is None:
                 continue
             entities.append(TronbytSelect(coordinator, device_id, description))
+
+    for description in CONFIG_SELECT_DESCRIPTIONS:
+        for device in coordinator.data:
+            device_id = device.get("id")
+            if device_id is None:
+                continue
+            entities.append(TronbytConfigSelect(coordinator, device_id, description))
 
     if entities:
         async_add_entities(entities)
@@ -165,6 +200,68 @@ class TronbytSelect(CoordinatorEntity, SelectEntity):
     @property
     def unit_of_measurement(self) -> str | None:  # type: ignore[override]
         return None
+
+    @property
+    def device_info(self) -> dict[str, Any]:
+        return build_device_info(self._device(), self._deviceid)
+
+
+class TronbytConfigSelect(CoordinatorEntity, SelectEntity):
+    """Select entity for Tronbyt configuration settings."""
+
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        coordinator,
+        device_id: str,
+        description: TronbytConfigSelectDescription,
+    ) -> None:
+        super().__init__(coordinator)
+        self._description = description
+        self._deviceid = device_id
+        self._attr_unique_id = f"tronbyt-{description.key}-{device_id}"
+        self._attr_icon = description.icon
+        self._attr_translation_key = description.translation_key
+        self._attr_entity_registry_enabled_default = (
+            description.entity_registry_enabled_default
+        )
+        self._attr_entity_category = description.entity_category
+        self._attr_device_class = None
+
+    def _device(self) -> Optional[dict[str, Any]]:
+        for device in self.coordinator.data or []:
+            if device.get("id") == self._deviceid:
+                return device
+        return None
+
+    @property
+    def available(self) -> bool:
+        return self._device() is not None
+
+    @property
+    def options(self) -> list[str]:
+        return list(self._description.options.keys())
+
+    @property
+    def current_option(self) -> str | None:
+        device = self._device()
+        if not device:
+            return None
+        current_val = self._description.value_fn(device)
+        for label, val in self._description.options.items():
+            if val == current_val:
+                return label
+        return None
+
+    async def async_select_option(self, option: str) -> None:
+        value = self._description.options.get(option)
+        if value is None:
+            return
+        await self.coordinator.async_update_firmware_settings(
+            self._deviceid,
+            {self._description.patch_key: value},
+        )
 
     @property
     def device_info(self) -> dict[str, Any]:

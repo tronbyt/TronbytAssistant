@@ -55,6 +55,8 @@ PLATFORMS: list[Platform] = [
     Platform.NUMBER,
     Platform.TIME,
     Platform.SELECT,
+    Platform.BUTTON,
+    Platform.TEXT,
 ]
 
 DATA_CONFIG = "config"
@@ -512,13 +514,19 @@ class TronbytCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
     def verify_ssl(self) -> bool:
         return self._verify_ssl
 
-    async def _async_update_data(self) -> list[dict[str, Any]]:
-        session = async_get_clientsession(self.hass, verify_ssl=self._verify_ssl)
-        endpoint = f"{self._base_url}/v0/devices"
+    def _get_api_headers(self, content_type: str | None = None) -> dict[str, str]:
         headers = {
             "Authorization": f"Bearer {self._token}",
             "Accept": "application/json",
         }
+        if content_type:
+            headers["Content-Type"] = content_type
+        return headers
+
+    async def _async_update_data(self) -> list[dict[str, Any]]:
+        session = async_get_clientsession(self.hass, verify_ssl=self._verify_ssl)
+        endpoint = f"{self._base_url}/v0/devices"
+        headers = self._get_api_headers()
         try:
             async with session.get(endpoint, headers=headers) as response:
                 if response.status == 401:
@@ -560,14 +568,34 @@ class TronbytCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
 
         return devices
 
+    async def async_reboot_device(self, deviceid: str) -> None:
+        session = async_get_clientsession(self.hass, verify_ssl=self._verify_ssl)
+        url = f"{self._base_url}/v0/devices/{deviceid}/reboot"
+        headers = self._get_api_headers()
+        async with session.post(url, headers=headers) as response:
+            if response.status != 200:
+                error = await response.text()
+                raise HomeAssistantError(f"Failed to reboot device {deviceid}: {error}")
+
+    async def async_update_firmware_settings(
+        self, deviceid: str, payload: dict[str, Any]
+    ) -> None:
+        session = async_get_clientsession(self.hass, verify_ssl=self._verify_ssl)
+        url = f"{self._base_url}/v0/devices/{deviceid}/update_firmware_settings"
+        headers = self._get_api_headers("application/json")
+        async with session.post(url, headers=headers, json=payload) as response:
+            if response.status != 200:
+                error = await response.text()
+                raise HomeAssistantError(
+                    f"Failed to update firmware settings for {deviceid}: {error}"
+                )
+
+        await self.async_request_refresh()
+
     async def async_patch_device(self, deviceid: str, payload: dict[str, Any]) -> None:
         session = async_get_clientsession(self.hass, verify_ssl=self._verify_ssl)
         url = f"{self._base_url}/v0/devices/{deviceid}"
-        headers = {
-            "Authorization": f"Bearer {self._token}",
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-        }
+        headers = self._get_api_headers("application/json")
 
         async with session.patch(url, headers=headers, json=payload) as response:
             if response.status != 200:
@@ -587,11 +615,7 @@ class TronbytCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
     ) -> None:
         session = async_get_clientsession(self.hass, verify_ssl=self._verify_ssl)
         url = f"{self._base_url}/v0/devices/{deviceid}/installations/{installation_id}"
-        headers = {
-            "Authorization": f"Bearer {self._token}",
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-        }
+        headers = self._get_api_headers("application/json")
 
         async with session.patch(url, headers=headers, json=payload) as response:
             if response.status != 200:
@@ -609,10 +633,7 @@ class TronbytCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
         self, session: aiohttp.ClientSession, deviceid: str
     ) -> list[dict[str, Any]]:
         url = f"{self._base_url}/v0/devices/{deviceid}/installations"
-        headers = {
-            "Authorization": f"Bearer {self._token}",
-            "Accept": "application/json",
-        }
+        headers = self._get_api_headers()
         async with session.get(url, headers=headers) as response:
             if response.status != 200:
                 error = await response.text()
@@ -677,6 +698,16 @@ class TronbytCoordinator(DataUpdateCoordinator[list[dict[str, Any]]]):
                 "protocol_version": info.get("protocolVersion"),
                 "protocol_type": info.get("protocolType"),
                 "mac_address": info.get("macAddress"),
+                "ssid": info.get("ssid"),
+                "wifi_power_save": info.get("wifiPowerSave"),
+                "skip_display_version": info.get("skipDisplayVersion"),
+                "ap_mode": info.get("apMode"),
+                "prefer_ipv6": info.get("preferIPv6"),
+                "swap_colors": info.get("swapColors"),
+                "image_url": info.get("imageUrl"),
+                "hostname": info.get("hostname"),
+                "sntp_server": info.get("sntpServer"),
+                "syslog_addr": info.get("syslogAddr"),
             },
             "installations": installations if installations is not None else [],
         }

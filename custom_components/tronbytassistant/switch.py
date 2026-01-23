@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 import logging
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
@@ -14,6 +15,49 @@ from .const import DATA_COORDINATOR, DOMAIN
 from .device import build_device_info
 
 _LOGGER = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class TronbytSwitchDescription:
+    key: str
+    translation_key: str | None
+    icon: str | None
+    value_fn: Callable[[dict[str, Any]], bool | None]
+    patch_key: str
+    entity_registry_enabled_default: bool = True
+    entity_category: EntityCategory | None = EntityCategory.CONFIG
+
+
+SWITCH_DESCRIPTIONS: tuple[TronbytSwitchDescription, ...] = (
+    TronbytSwitchDescription(
+        key="skip_display_version",
+        translation_key="skip_display_version",
+        icon="mdi:counter",
+        value_fn=lambda device: (device.get("info") or {}).get("skip_display_version"),
+        patch_key="skipDisplayVersion",
+    ),
+    TronbytSwitchDescription(
+        key="ap_mode",
+        translation_key="ap_mode",
+        icon="mdi:access-point",
+        value_fn=lambda device: (device.get("info") or {}).get("ap_mode"),
+        patch_key="apMode",
+    ),
+    TronbytSwitchDescription(
+        key="prefer_ipv6",
+        translation_key="prefer_ipv6",
+        icon="mdi:ip-network",
+        value_fn=lambda device: (device.get("info") or {}).get("prefer_ipv6"),
+        patch_key="preferIPv6",
+    ),
+    TronbytSwitchDescription(
+        key="swap_colors",
+        translation_key="swap_colors",
+        icon="mdi:palette-swatch",
+        value_fn=lambda device: (device.get("info") or {}).get("swap_colors"),
+        patch_key="swapColors",
+    ),
+)
 
 
 async def async_setup_entry(
@@ -32,6 +76,9 @@ async def async_setup_entry(
         if not device_id:
             continue
         entities.append(TronbytNightModeSwitch(coordinator, device_id))
+
+        for description in SWITCH_DESCRIPTIONS:
+            entities.append(TronbytFirmwareSwitch(coordinator, device_id, description))
 
         for install in device.get("installations") or []:
             install_id = install.get("id")
@@ -170,3 +217,59 @@ class TronbytInstallationSwitch(CoordinatorEntity, SwitchEntity):
     @property
     def device_info(self) -> dict[str, Any]:
         return build_device_info(self._device(), self._deviceid)
+
+
+class TronbytFirmwareSwitch(CoordinatorEntity, SwitchEntity):
+    """Switch for Tronbyt firmware settings."""
+
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        coordinator,
+        device_id: str,
+        description: TronbytSwitchDescription,
+    ) -> None:
+        super().__init__(coordinator)
+        self._description = description
+        self._deviceid = device_id
+        self._attr_unique_id = f"tronbyt-{description.key}-{device_id}"
+        self._attr_icon = description.icon
+        self._attr_translation_key = description.translation_key
+        self._attr_entity_registry_enabled_default = (
+            description.entity_registry_enabled_default
+        )
+        self._attr_entity_category = description.entity_category
+
+    def _device(self) -> dict[str, Any] | None:
+        for device in self.coordinator.data or []:
+            if device.get("id") == self._deviceid:
+                return device
+        return None
+
+    @property
+    def available(self) -> bool:
+        return self._device() is not None
+
+    @property
+    def is_on(self) -> bool | None:
+        device = self._device()
+        if not device:
+            return None
+        return self._description.value_fn(device)
+
+    @property
+    def device_info(self) -> dict[str, Any]:
+        return build_device_info(self._device(), self._deviceid)
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        await self.coordinator.async_update_firmware_settings(
+            self._deviceid,
+            {self._description.patch_key: True},
+        )
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        await self.coordinator.async_update_firmware_settings(
+            self._deviceid,
+            {self._description.patch_key: False},
+        )
