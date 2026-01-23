@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 import voluptuous as vol
@@ -11,7 +11,6 @@ from custom_components.tronbytassistant.config_flow import (
     CannotConnect,
     InvalidAuth,
     NoDevicesFound,
-    TronbytAssistantConfigFlow,
     _normalize_base_url,
 )
 from custom_components.tronbytassistant.const import (
@@ -20,6 +19,8 @@ from custom_components.tronbytassistant.const import (
     CONF_VERIFY_SSL,
     DOMAIN,
 )
+
+from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 
 def _get_suggested_value(schema: vol.Schema, field: str):
@@ -41,10 +42,9 @@ def _get_suggested_value(schema: vol.Schema, field: str):
 async def test_user_flow_success(hass):
     """Validate that a user initiated flow succeeds."""
     device_payload = [{"id": "961adee8", "name": "Living Room"}]
-    with patch.object(
-        TronbytAssistantConfigFlow,
-        "_async_fetch_devices",
-        AsyncMock(return_value=device_payload),
+    with patch(
+        "custom_components.tronbytassistant.config_flow.validate_input",
+        return_value=device_payload,
     ):
         result = await hass.config_entries.flow.async_init(
             DOMAIN,
@@ -79,10 +79,9 @@ async def test_user_flow_rejects_bad_url(hass):
 @pytest.mark.asyncio
 async def test_user_flow_invalid_auth(hass):
     """Ensure authentication errors are reported."""
-    with patch.object(
-        TronbytAssistantConfigFlow,
-        "_async_fetch_devices",
-        AsyncMock(side_effect=InvalidAuth),
+    with patch(
+        "custom_components.tronbytassistant.config_flow.validate_input",
+        side_effect=InvalidAuth,
     ):
         result = await hass.config_entries.flow.async_init(
             DOMAIN,
@@ -102,10 +101,9 @@ async def test_user_flow_invalid_auth(hass):
 @pytest.mark.asyncio
 async def test_user_flow_cannot_connect(hass):
     """Ensure connectivity errors are reported."""
-    with patch.object(
-        TronbytAssistantConfigFlow,
-        "_async_fetch_devices",
-        AsyncMock(side_effect=CannotConnect),
+    with patch(
+        "custom_components.tronbytassistant.config_flow.validate_input",
+        side_effect=CannotConnect,
     ):
         result = await hass.config_entries.flow.async_init(
             DOMAIN,
@@ -125,10 +123,9 @@ async def test_user_flow_cannot_connect(hass):
 @pytest.mark.asyncio
 async def test_user_flow_no_devices(hass):
     """Ensure the flow stops when no devices are returned."""
-    with patch.object(
-        TronbytAssistantConfigFlow,
-        "_async_fetch_devices",
-        AsyncMock(side_effect=NoDevicesFound),
+    with patch(
+        "custom_components.tronbytassistant.config_flow.validate_input",
+        side_effect=NoDevicesFound,
     ):
         result = await hass.config_entries.flow.async_init(
             DOMAIN,
@@ -148,10 +145,9 @@ async def test_user_flow_no_devices(hass):
 @pytest.mark.asyncio
 async def test_import_flow_success(hass):
     """Validate YAML import flow."""
-    with patch.object(
-        TronbytAssistantConfigFlow,
-        "_async_fetch_devices",
-        AsyncMock(return_value=[{"id": "961adee8", "name": "Living Room"}]),
+    with patch(
+        "custom_components.tronbytassistant.config_flow.validate_input",
+        return_value=[{"id": "961adee8", "name": "Living Room"}],
     ):
         result = await hass.config_entries.flow.async_init(
             DOMAIN,
@@ -194,10 +190,9 @@ def test_config_flow_normalize_base_url():
 @pytest.mark.asyncio
 async def test_user_flow_preserves_verify_ssl_toggle(hass):
     """Ensure toggled SSL flag persists after an error."""
-    with patch.object(
-        TronbytAssistantConfigFlow,
-        "_async_fetch_devices",
-        AsyncMock(side_effect=CannotConnect),
+    with patch(
+        "custom_components.tronbytassistant.config_flow.validate_input",
+        side_effect=CannotConnect,
     ):
         result = await hass.config_entries.flow.async_init(
             DOMAIN,
@@ -214,3 +209,40 @@ async def test_user_flow_preserves_verify_ssl_toggle(hass):
     assert _get_suggested_value(schema, CONF_API_URL) == "https://example.com"
     assert _get_suggested_value(schema, CONF_TOKEN) == "secret"
     assert _get_suggested_value(schema, CONF_VERIFY_SSL) is False
+
+
+@pytest.mark.asyncio
+async def test_options_flow(hass):
+    """Test the options flow."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            CONF_API_URL: "https://example.com",
+            CONF_TOKEN: "old_token",
+            CONF_VERIFY_SSL: True,
+        },
+    )
+    entry.add_to_hass(hass)
+
+    result = await hass.config_entries.options.async_init(entry.entry_id)
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "init"
+
+    with patch(
+        "custom_components.tronbytassistant.config_flow.validate_input",
+        return_value=[{"id": "dev1", "name": "Device 1"}],
+    ):
+        result = await hass.config_entries.options.async_configure(
+            result["flow_id"],
+            user_input={
+                CONF_API_URL: "https://new.example.com",
+                CONF_TOKEN: "new_token",
+                CONF_VERIFY_SSL: False,
+            },
+        )
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert entry.data[CONF_API_URL] == "https://new.example.com"
+    assert entry.data[CONF_TOKEN] == "new_token"
+    assert entry.data[CONF_VERIFY_SSL] is False

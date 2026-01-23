@@ -7,7 +7,7 @@ import aiohttp
 import voluptuous as vol
 
 from homeassistant import config_entries
-from homeassistant.core import callback
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
@@ -22,6 +22,52 @@ USER_DATA_SCHEMA = vol.Schema(
 )
 
 
+async def validate_input(
+    hass: HomeAssistant, data: dict[str, Any]
+) -> list[dict[str, Any]]:
+    """Validate the user input allows us to connect.
+
+    Data has the keys from USER_DATA_SCHEMA with values provided by the user.
+    """
+    api_url = _normalize_base_url(data[CONF_API_URL])
+    token = data[CONF_TOKEN]
+    verify_ssl = data.get(CONF_VERIFY_SSL, True)
+
+    endpoint = f"{api_url}/v0/devices"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/json",
+    }
+
+    session = async_get_clientsession(hass, verify_ssl=verify_ssl)
+    try:
+        async with session.get(endpoint, headers=headers) as response:
+            if response.status == 401:
+                raise InvalidAuth
+            if response.status != 200:
+                raise CannotConnect
+            payload = await response.json()
+    except aiohttp.ClientError as err:
+        raise CannotConnect from err
+
+    devices = payload.get("devices") or []
+    if not devices:
+        raise NoDevicesFound
+
+    normalized: list[dict[str, Any]] = []
+    for item in devices:
+        device_id = item.get("id")
+        if not device_id:
+            continue
+        name = item.get("displayName") or device_id
+        normalized.append({"id": device_id, "name": name})
+
+    if not normalized:
+        raise NoDevicesFound
+
+    return normalized
+
+
 class TronbytAssistantConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for TronbytAssistant."""
 
@@ -32,16 +78,12 @@ class TronbytAssistantConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             try:
-                api_url = _normalize_base_url(user_input[CONF_API_URL])
+                _normalize_base_url(user_input[CONF_API_URL])
             except ValueError:
                 errors["base"] = "invalid_url"
             else:
-                token = user_input[CONF_TOKEN]
-                verify_ssl = user_input.get(CONF_VERIFY_SSL, True)
                 try:
-                    devices = await self._async_fetch_devices(
-                        api_url, token, verify_ssl
-                    )
+                    devices = await validate_input(self.hass, user_input)
                 except CannotConnect:
                     errors["base"] = "cannot_connect"
                 except InvalidAuth:
@@ -51,17 +93,19 @@ class TronbytAssistantConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 else:
                     await self.async_set_unique_id(DOMAIN)
                     self._abort_if_unique_id_configured()
+                    
+                    api_url = _normalize_base_url(user_input[CONF_API_URL])
                     parsed = urlparse(api_url)
                     title = parsed.hostname or parsed.netloc or api_url
                     if not title and devices:
                         title = devices[0]["name"]
+                    
+                    if CONF_VERIFY_SSL not in user_input:
+                        user_input[CONF_VERIFY_SSL] = True
+
                     return self.async_create_entry(
                         title=title,
-                        data={
-                            CONF_API_URL: api_url,
-                            CONF_TOKEN: token,
-                            CONF_VERIFY_SSL: verify_ssl,
-                        },
+                        data=user_input,
                     )
 
         schema = self.add_suggested_values_to_schema(USER_DATA_SCHEMA, user_input)
@@ -74,18 +118,15 @@ class TronbytAssistantConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     async def async_step_import(self, user_input: dict[str, Any]):
         try:
-            api_url = _normalize_base_url(user_input.get(CONF_API_URL))
+            _normalize_base_url(user_input.get(CONF_API_URL))
         except ValueError:
             return self.async_abort(reason="invalid_import")
 
-        token = user_input.get(CONF_TOKEN)
-        if not token:
+        if not user_input.get(CONF_TOKEN):
             return self.async_abort(reason="invalid_import")
 
-        verify_ssl = user_input.get(CONF_VERIFY_SSL, True)
-
         try:
-            await self._async_fetch_devices(api_url, token, verify_ssl)
+            await validate_input(self.hass, user_input)
         except InvalidAuth:
             return self.async_abort(reason="invalid_api_key")
         except NoDevicesFound:
@@ -95,51 +136,17 @@ class TronbytAssistantConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         await self.async_set_unique_id(DOMAIN)
         self._abort_if_unique_id_configured()
+        
+        api_url = _normalize_base_url(user_input[CONF_API_URL])
+        user_input[CONF_API_URL] = api_url
+
+        if CONF_VERIFY_SSL not in user_input:
+            user_input[CONF_VERIFY_SSL] = True
+
         return self.async_create_entry(
             title=urlparse(api_url).hostname or urlparse(api_url).netloc or api_url,
-            data={
-                CONF_API_URL: api_url,
-                CONF_TOKEN: token,
-                CONF_VERIFY_SSL: verify_ssl,
-            },
+            data=user_input,
         )
-
-    async def _async_fetch_devices(
-        self, api_url: str, token: str, verify_ssl: bool
-    ) -> list[dict[str, Any]]:
-        endpoint = f"{api_url}/v0/devices"
-        headers = {
-            "Authorization": f"Bearer {token}",
-            "Accept": "application/json",
-        }
-
-        session = async_get_clientsession(self.hass, verify_ssl=verify_ssl)
-        try:
-            async with session.get(endpoint, headers=headers) as response:
-                if response.status == 401:
-                    raise InvalidAuth
-                if response.status != 200:
-                    raise CannotConnect
-                payload = await response.json()
-        except aiohttp.ClientError as err:
-            raise CannotConnect from err
-
-        devices = payload.get("devices") or []
-        if not devices:
-            raise NoDevicesFound
-
-        normalized: list[dict[str, Any]] = []
-        for item in devices:
-            device_id = item.get("id")
-            if not device_id:
-                continue
-            name = item.get("displayName") or device_id
-            normalized.append({"id": device_id, "name": name})
-
-        if not normalized:
-            raise NoDevicesFound
-
-        return normalized
 
     @staticmethod
     @callback
@@ -156,7 +163,36 @@ class TronbytAssistantOptionsFlow(config_entries.OptionsFlow):
         self._config_entry = config_entry
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None):
-        return self.async_abort(reason="not_supported")
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            try:
+                _normalize_base_url(user_input[CONF_API_URL])
+            except ValueError:
+                errors["base"] = "invalid_url"
+            else:
+                try:
+                    await validate_input(self.hass, user_input)
+                except CannotConnect:
+                    errors["base"] = "cannot_connect"
+                except InvalidAuth:
+                    errors["base"] = "invalid_api_key"
+                except NoDevicesFound:
+                    errors["base"] = "no_devices_found"
+                else:
+                    self.hass.config_entries.async_update_entry(
+                        self._config_entry, data=user_input
+                    )
+                    return self.async_create_entry(title="", data={})
+
+        current_config = self._config_entry.data
+        schema = self.add_suggested_values_to_schema(USER_DATA_SCHEMA, current_config)
+
+        return self.async_show_form(
+            step_id="init",
+            data_schema=schema,
+            errors=errors,
+        )
 
 
 class CannotConnect(HomeAssistantError):

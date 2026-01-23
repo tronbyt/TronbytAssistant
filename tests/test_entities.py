@@ -14,6 +14,8 @@ from custom_components.tronbytassistant import number as number_mod
 from custom_components.tronbytassistant import select as select_mod
 from custom_components.tronbytassistant import switch as switch_mod
 from custom_components.tronbytassistant import time as time_mod
+from custom_components.tronbytassistant import button as button_mod
+from custom_components.tronbytassistant import text as text_mod
 from custom_components.tronbytassistant.__init__ import TronbytCoordinator
 from custom_components.tronbytassistant.const import DOMAIN
 
@@ -44,6 +46,16 @@ def device_payload() -> dict[str, Any]:
             "protocol_version": 1,
             "protocol_type": "WS",
             "mac_address": "cc:dd:ee:ff:00:11",
+            "ssid": "MyWiFi",
+            "wifi_power_save": 1,
+            "skip_display_version": True,
+            "ap_mode": False,
+            "prefer_ipv6": True,
+            "swap_colors": False,
+            "image_url": "http://img",
+            "hostname": "myhost",
+            "sntp_server": "pool.ntp.org",
+            "syslog_addr": "1.2.3.4",
         },
         "installations": [
             {"id": "477", "appID": "Custom Clock", "enabled": True},
@@ -249,4 +261,96 @@ async def test_installation_switch_toggles_installation(
     await entity.async_turn_off()
     coordinator.async_patch_installation.assert_awaited_once_with(
         "dev1", "217", {"enabled": False}
+    )
+
+
+@pytest.mark.asyncio
+async def test_reboot_button(coordinator: TronbytCoordinator):
+    """Test reboot button calls correct async method."""
+    entity = button_mod.TronbytButton(coordinator, "dev1")
+    coordinator.async_reboot_device = AsyncMock()
+    await entity.async_press()
+    coordinator.async_reboot_device.assert_awaited_once_with("dev1")
+
+
+def test_text_entity_values(coordinator: TronbytCoordinator):
+    """Test text entity values extraction."""
+    # SSID
+    entity = text_mod.TronbytText(
+        coordinator, "dev1", text_mod.TEXT_DESCRIPTIONS[0]
+    )
+    assert entity.native_value == "MyWiFi"
+
+    # ImageURL
+    entity = text_mod.TronbytText(
+        coordinator, "dev1", text_mod.TEXT_DESCRIPTIONS[1]
+    )
+    assert entity.native_value == "http://img"
+
+
+@pytest.mark.asyncio
+async def test_text_entity_update(coordinator: TronbytCoordinator):
+    """Test text entity update calls firmware settings."""
+    entity = text_mod.TronbytText(
+        coordinator, "dev1", text_mod.TEXT_DESCRIPTIONS[2] # Hostname
+    )
+    coordinator.async_update_firmware_settings = AsyncMock()
+
+    await entity.async_set_value("newhost")
+    coordinator.async_update_firmware_settings.assert_awaited_once_with(
+        "dev1", {"hostname": "newhost"}
+    )
+
+
+def test_firmware_switch_values(coordinator: TronbytCoordinator):
+    """Test firmware switch values extraction."""
+    # SkipDisplayVersion
+    entity = switch_mod.TronbytFirmwareSwitch(
+        coordinator, "dev1", switch_mod.SWITCH_DESCRIPTIONS[0]
+    )
+    assert entity.is_on is True
+
+    # APMode
+    entity = switch_mod.TronbytFirmwareSwitch(
+        coordinator, "dev1", switch_mod.SWITCH_DESCRIPTIONS[1]
+    )
+    assert entity.is_on is False
+
+
+@pytest.mark.asyncio
+async def test_firmware_switch_update(coordinator: TronbytCoordinator):
+    """Test firmware switch update calls firmware settings."""
+    entity = switch_mod.TronbytFirmwareSwitch(
+        coordinator, "dev1", switch_mod.SWITCH_DESCRIPTIONS[2] # PreferIPv6
+    )
+    coordinator.async_update_firmware_settings = AsyncMock()
+
+    await entity.async_turn_off()
+    coordinator.async_update_firmware_settings.assert_awaited_once_with(
+        "dev1", {"preferIPv6": False}
+    )
+
+
+def test_config_select_values(coordinator: TronbytCoordinator):
+    """Test config select (WifiPowerSave)."""
+    entity = select_mod.TronbytConfigSelect(
+        coordinator, "dev1", select_mod.CONFIG_SELECT_DESCRIPTIONS[0]
+    )
+    # device payload has 1 -> min
+    assert entity.current_option == "min"
+    assert "min" in entity.options
+    assert "off" in entity.options
+
+
+@pytest.mark.asyncio
+async def test_config_select_update(coordinator: TronbytCoordinator):
+    """Test config select update calls firmware settings."""
+    entity = select_mod.TronbytConfigSelect(
+        coordinator, "dev1", select_mod.CONFIG_SELECT_DESCRIPTIONS[0]
+    )
+    coordinator.async_update_firmware_settings = AsyncMock()
+
+    await entity.async_select_option("max")
+    coordinator.async_update_firmware_settings.assert_awaited_once_with(
+        "dev1", {"wifiPowerSave": 2}
     )

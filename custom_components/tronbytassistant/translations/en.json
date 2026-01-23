@@ -17,6 +17,11 @@
     }
   },
   "entity": {
+    "button": {
+      "reboot_button": {
+        "name": "Restart"
+      }
+    },
     "light": {
       "brightness": {
         "name": "Brightness"
@@ -44,6 +49,23 @@
         "name": "Dim Mode Start"
       }
     },
+    "text": {
+      "ssid": {
+        "name": "SSID"
+      },
+      "image_url": {
+        "name": "Image URL"
+      },
+      "hostname": {
+        "name": "Hostname"
+      },
+      "sntp_server": {
+        "name": "SNTP Server"
+      },
+      "syslog_addr": {
+        "name": "Syslog Address"
+      }
+    },
     "select": {
       "night_mode_app": {
         "name": "Night Mode App",
@@ -56,6 +78,14 @@
         "state": {
           "none": "None"
         }
+      },
+      "wifi_power_save": {
+        "name": "WiFi Power Save",
+        "state": {
+          "off": "Off",
+          "min": "Minimum",
+          "max": "Maximum"
+        }
       }
     },
     "switch": {
@@ -64,6 +94,18 @@
       },
       "installation_switch": {
         "name": "Enable {label}"
+      },
+      "skip_display_version": {
+        "name": "Skip Display Version"
+      },
+      "ap_mode": {
+        "name": "AP Mode"
+      },
+      "prefer_ipv6": {
+        "name": "Prefer IPv6"
+      },
+      "swap_colors": {
+        "name": "Swap Colors"
       }
     }
   }
