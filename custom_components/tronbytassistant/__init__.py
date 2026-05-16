@@ -238,25 +238,6 @@ async def _async_register_services(
         pattern = r"^[A-Za-z0-9]+$"
         return bool(re.match(pattern, input_value))
 
-    async def getinstalledapps(deviceid: str, only_pushed: bool = True) -> list[str]:
-        url = f"{coordinator.base_url}/v0/devices/{deviceid}/installations"
-        header = {
-            "Authorization": f"Bearer {coordinator.token}",
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-        }
-        async with session.get(url, headers=header) as response:
-            if response.status != 200:
-                error = await response.text()
-                _LOGGER.error("%s", error)
-                raise HomeAssistantError(error)
-            appids: list[str] = []
-            data = await response.json()
-            for item in data["installations"]:
-                if not only_pushed or item["appID"] == "pushed":
-                    appids.append(item["id"])
-            return appids
-
     async def request(
         method: str,
         webhook_url: str,
@@ -401,18 +382,6 @@ async def _async_register_services(
         refresh_needed = False
         for item in targets:
             deviceid = item["id"]
-
-            validids = await getinstalledapps(deviceid)
-            if contentid not in validids:
-                _LOGGER.error(
-                    "The Content ID you entered is not an installed app on %s. Currently installed apps are: %s",
-                    item["name"],
-                    validids,
-                )
-                raise HomeAssistantError(
-                    f"The Content ID you entered is not an installed app on {item['name']}. Currently installed apps are: {validids}"
-                )
-
             url = f"{coordinator.base_url}/v0/devices/{deviceid}/installations/{contentid}"
             await request("DELETE", url, {})
             refresh_needed = True
@@ -434,18 +403,6 @@ async def _async_register_services(
         refresh_needed = False
         for item in targets:
             deviceid = item["id"]
-
-            validids = await getinstalledapps(deviceid, only_pushed=False)
-            if contentid not in validids:
-                _LOGGER.error(
-                    "The Content ID you entered is not an installed app on %s. Currently installed apps are: %s",
-                    item["name"],
-                    validids,
-                )
-                raise HomeAssistantError(
-                    f"The Content ID you entered is not an installed app on {item['name']}. Currently installed apps are: {validids}"
-                )
-
             endpoint = f"{coordinator.base_url}/v0/devices/{deviceid}/installations/{contentid}"
             await request("PATCH", endpoint, payload)
             refresh_needed = True
