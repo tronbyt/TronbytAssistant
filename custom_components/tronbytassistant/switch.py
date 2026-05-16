@@ -35,6 +35,7 @@ SWITCH_DESCRIPTIONS: tuple[TronbytSwitchDescription, ...] = (
         icon="mdi:counter",
         value_fn=lambda device: (device.get("info") or {}).get("skip_display_version"),
         patch_key="skipDisplayVersion",
+        entity_registry_enabled_default=False,
     ),
     TronbytSwitchDescription(
         key="ap_mode",
@@ -42,6 +43,7 @@ SWITCH_DESCRIPTIONS: tuple[TronbytSwitchDescription, ...] = (
         icon="mdi:access-point",
         value_fn=lambda device: (device.get("info") or {}).get("ap_mode"),
         patch_key="apMode",
+        entity_registry_enabled_default=False,
     ),
     TronbytSwitchDescription(
         key="prefer_ipv6",
@@ -49,6 +51,7 @@ SWITCH_DESCRIPTIONS: tuple[TronbytSwitchDescription, ...] = (
         icon="mdi:ip-network",
         value_fn=lambda device: (device.get("info") or {}).get("prefer_ipv6"),
         patch_key="preferIPv6",
+        entity_registry_enabled_default=False,
     ),
     TronbytSwitchDescription(
         key="swap_colors",
@@ -56,6 +59,7 @@ SWITCH_DESCRIPTIONS: tuple[TronbytSwitchDescription, ...] = (
         icon="mdi:palette-swatch",
         value_fn=lambda device: (device.get("info") or {}).get("swap_colors"),
         patch_key="swapColors",
+        entity_registry_enabled_default=False,
     ),
 )
 
