@@ -7,8 +7,9 @@ from typing import Any, Optional
 
 from homeassistant.components.light import ATTR_BRIGHTNESS, ColorMode, LightEntity
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.helpers.entity import EntityCategory
 
@@ -99,7 +100,7 @@ async def async_setup_entry(
         async_add_entities(entities)
 
 
-class TronbytLight(CoordinatorEntity, LightEntity):
+class TronbytLight(CoordinatorEntity, LightEntity, RestoreEntity):
     """Brightness style light bound to a Tronbyt device attribute."""
 
     _attr_supported_color_modes = {ColorMode.BRIGHTNESS}
@@ -119,6 +120,40 @@ class TronbytLight(CoordinatorEntity, LightEntity):
         self._attr_icon = description.icon
         self._attr_translation_key = description.translation_key
         self._attr_entity_category = description.entity_category
+        self._last_brightness: int | None = None
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        last_state = await self.async_get_last_state()
+        if last_state:
+            stored = last_state.attributes.get("last_brightness")
+            if stored is None:
+                stored = last_state.attributes.get(ATTR_BRIGHTNESS)
+            if stored is not None:
+                try:
+                    self._last_brightness = int(stored)
+                except (TypeError, ValueError):
+                    _LOGGER.debug(
+                        "Ignoring invalid restored brightness for %s: %r",
+                        self.entity_id,
+                        stored,
+                    )
+        current = self.brightness
+        if current:
+            self._last_brightness = current
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        current = self.brightness
+        if current:
+            self._last_brightness = current
+        super()._handle_coordinator_update()
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        if self._last_brightness is not None:
+            return {"last_brightness": self._last_brightness}
+        return {}
 
     def _device(self) -> Optional[dict[str, Any]]:
         for device in self.coordinator.data or []:
@@ -157,8 +192,8 @@ class TronbytLight(CoordinatorEntity, LightEntity):
             brightness = int(kwargs[ATTR_BRIGHTNESS])
         else:
             brightness = self.brightness
-            if brightness is None:
-                brightness = self._description.default_on
+            if not brightness:
+                brightness = self._last_brightness or self._description.default_on
 
         brightness = max(BRIGHTNESS_MIN, min(BRIGHTNESS_MAX, brightness))
         api_value = int(round((brightness / BRIGHTNESS_MAX) * BRIGHTNESS_API_MAX))

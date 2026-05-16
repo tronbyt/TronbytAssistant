@@ -103,6 +103,44 @@ async def test_light_brightness_and_controls(coordinator: TronbytCoordinator):
 
 
 @pytest.mark.asyncio
+async def test_light_restores_last_brightness_after_off(
+    coordinator: TronbytCoordinator,
+):
+    """turn_on with no args should restore the last non-zero brightness."""
+    entity = light_mod.TronbytLight(
+        coordinator, "dev1", light_mod.LIGHT_DESCRIPTIONS[0]
+    )
+    coordinator.async_patch_device = AsyncMock()
+    entity.async_write_ha_state = lambda: None
+
+    entity._handle_coordinator_update()
+    assert entity._last_brightness == 204  # 80% in 0-255
+
+    coordinator.data[0]["brightness"] = 0
+    entity._handle_coordinator_update()
+    assert entity.is_on is False
+    assert entity._last_brightness == 204
+
+    await entity.async_turn_on()
+    coordinator.async_patch_device.assert_awaited_once_with("dev1", {"brightness": 80})
+
+
+@pytest.mark.asyncio
+async def test_light_falls_back_to_default_when_no_history(
+    coordinator: TronbytCoordinator,
+):
+    """With no cached brightness and device at 0, fall back to default_on."""
+    coordinator.data[0]["brightness"] = 0
+    entity = light_mod.TronbytLight(
+        coordinator, "dev1", light_mod.LIGHT_DESCRIPTIONS[0]
+    )
+    coordinator.async_patch_device = AsyncMock()
+
+    await entity.async_turn_on()
+    coordinator.async_patch_device.assert_awaited_once_with("dev1", {"brightness": 100})
+
+
+@pytest.mark.asyncio
 async def test_night_mode_brightness_defaults(coordinator: TronbytCoordinator):
     """Night mode light should use the default on value if brightness unavailable."""
     data = deepcopy(coordinator.data[0])
