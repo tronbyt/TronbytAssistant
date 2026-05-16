@@ -33,7 +33,7 @@ class TronbytNumberDescription:
 NUMBER_DESCRIPTIONS: tuple[TronbytNumberDescription, ...] = (
     TronbytNumberDescription(
         key="interval",
-        translation_key="update_interval",
+        translation_key="app_cycle_time",
         icon="mdi:timer-sand",
         min_value=1,
         max_value=3600,
