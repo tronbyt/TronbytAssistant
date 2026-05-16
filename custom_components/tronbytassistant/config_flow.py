@@ -93,13 +93,13 @@ class TronbytAssistantConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 else:
                     await self.async_set_unique_id(DOMAIN)
                     self._abort_if_unique_id_configured()
-                    
+
                     api_url = _normalize_base_url(user_input[CONF_API_URL])
                     parsed = urlparse(api_url)
                     title = parsed.hostname or parsed.netloc or api_url
                     if not title and devices:
                         title = devices[0]["name"]
-                    
+
                     if CONF_VERIFY_SSL not in user_input:
                         user_input[CONF_VERIFY_SSL] = True
 
@@ -136,7 +136,7 @@ class TronbytAssistantConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         await self.async_set_unique_id(DOMAIN)
         self._abort_if_unique_id_configured()
-        
+
         api_url = _normalize_base_url(user_input[CONF_API_URL])
         user_input[CONF_API_URL] = api_url
 

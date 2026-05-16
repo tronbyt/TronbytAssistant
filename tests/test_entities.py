@@ -276,15 +276,11 @@ async def test_reboot_button(coordinator: TronbytCoordinator):
 def test_text_entity_values(coordinator: TronbytCoordinator):
     """Test text entity values extraction."""
     # SSID
-    entity = text_mod.TronbytText(
-        coordinator, "dev1", text_mod.TEXT_DESCRIPTIONS[0]
-    )
+    entity = text_mod.TronbytText(coordinator, "dev1", text_mod.TEXT_DESCRIPTIONS[0])
     assert entity.native_value == "MyWiFi"
 
     # ImageURL
-    entity = text_mod.TronbytText(
-        coordinator, "dev1", text_mod.TEXT_DESCRIPTIONS[1]
-    )
+    entity = text_mod.TronbytText(coordinator, "dev1", text_mod.TEXT_DESCRIPTIONS[1])
     assert entity.native_value == "http://img"
 
 
@@ -292,7 +288,9 @@ def test_text_entity_values(coordinator: TronbytCoordinator):
 async def test_text_entity_update(coordinator: TronbytCoordinator):
     """Test text entity update calls firmware settings."""
     entity = text_mod.TronbytText(
-        coordinator, "dev1", text_mod.TEXT_DESCRIPTIONS[2] # Hostname
+        coordinator,
+        "dev1",
+        text_mod.TEXT_DESCRIPTIONS[2],  # Hostname
     )
     coordinator.async_update_firmware_settings = AsyncMock()
 
@@ -321,7 +319,9 @@ def test_firmware_switch_values(coordinator: TronbytCoordinator):
 async def test_firmware_switch_update(coordinator: TronbytCoordinator):
     """Test firmware switch update calls firmware settings."""
     entity = switch_mod.TronbytFirmwareSwitch(
-        coordinator, "dev1", switch_mod.SWITCH_DESCRIPTIONS[2] # PreferIPv6
+        coordinator,
+        "dev1",
+        switch_mod.SWITCH_DESCRIPTIONS[2],  # PreferIPv6
     )
     coordinator.async_update_firmware_settings = AsyncMock()
 
