@@ -193,23 +193,30 @@ async def _async_register_services(
                     raise HomeAssistantError(
                         f"Device {device_id} is not registered in Home Assistant."
                     )
-                matched_id = None
-                for domain, identifier in entry.identifiers:
-                    if domain == DOMAIN:
-                        matched_id = identifier
-                        break
-                if matched_id is None:
+
+                tronbyt_ids = [
+                    identifier
+                    for domain, identifier in entry.identifiers
+                    if domain == DOMAIN
+                ]
+                if not tronbyt_ids:
                     raise HomeAssistantError(
                         f"Device {device_id} is not managed by TronbytAssistant."
                     )
-                device = ids_map.get(matched_id)
-                if device is None:
+
+                matched_device = next(
+                    (ids_map[tid] for tid in tronbyt_ids if tid in ids_map), None
+                )
+                if matched_device is None:
+                    device_label = entry.name_by_user or entry.name or device_id
                     raise HomeAssistantError(
-                        f"Tronbyt device with id {matched_id} is not available."
+                        f"Tronbyt device {device_label!r} is not available. "
+                        f"Registered Tronbyt identifiers: {', '.join(sorted(tronbyt_ids))}."
                     )
-                if matched_id not in seen:
-                    resolved.append(device)
-                    seen.add(matched_id)
+
+                if matched_device["id"] not in seen:
+                    resolved.append(matched_device)
+                    seen.add(matched_device["id"])
 
         raw_names = call.data.get(ATTR_DEVICENANME)
         if raw_names:
