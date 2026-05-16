@@ -351,7 +351,7 @@ async def _async_register_services(
             elif contenttype == CONTENT_TYPE_CUSTOM:
                 content = custom_content
 
-                args = call.data.get(ATTR_ARGS)
+                args = call.data.get(ATTR_ARGS) or []
                 if isinstance(args, str):
                     args = args.split(";")
                 for pair in args:
