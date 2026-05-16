@@ -32,6 +32,7 @@ TEXT_DESCRIPTIONS: tuple[TronbytTextDescription, ...] = (
         icon="mdi:wifi",
         value_fn=lambda device: (device.get("info") or {}).get("ssid"),
         patch_key="ssid",
+        entity_registry_enabled_default=False,
     ),
     TronbytTextDescription(
         key="image_url",
@@ -39,6 +40,7 @@ TEXT_DESCRIPTIONS: tuple[TronbytTextDescription, ...] = (
         icon="mdi:image",
         value_fn=lambda device: (device.get("info") or {}).get("image_url"),
         patch_key="imageUrl",
+        entity_registry_enabled_default=False,
     ),
     TronbytTextDescription(
         key="hostname",
@@ -46,6 +48,7 @@ TEXT_DESCRIPTIONS: tuple[TronbytTextDescription, ...] = (
         icon="mdi:rename-box",
         value_fn=lambda device: (device.get("info") or {}).get("hostname"),
         patch_key="hostname",
+        entity_registry_enabled_default=False,
     ),
     TronbytTextDescription(
         key="sntp_server",
@@ -53,6 +56,7 @@ TEXT_DESCRIPTIONS: tuple[TronbytTextDescription, ...] = (
         icon="mdi:clock-time-four-outline",
         value_fn=lambda device: (device.get("info") or {}).get("sntp_server"),
         patch_key="sntpServer",
+        entity_registry_enabled_default=False,
     ),
     TronbytTextDescription(
         key="syslog_addr",
@@ -60,6 +64,7 @@ TEXT_DESCRIPTIONS: tuple[TronbytTextDescription, ...] = (
         icon="mdi:file-document-outline",
         value_fn=lambda device: (device.get("info") or {}).get("syslog_addr"),
         patch_key="syslogAddr",
+        entity_registry_enabled_default=False,
     ),
 )
 

@@ -70,6 +70,7 @@ CONFIG_SELECT_DESCRIPTIONS: tuple[TronbytConfigSelectDescription, ...] = (
             "min": 1,
             "max": 2,
         },
+        entity_registry_enabled_default=False,
     ),
 )
 
