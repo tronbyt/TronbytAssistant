@@ -34,8 +34,8 @@
       }
     },
     "number": {
-      "update_interval": {
-        "name": "Update Interval"
+      "app_cycle_time": {
+        "name": "App Cycle Time"
       }
     },
     "time": {
