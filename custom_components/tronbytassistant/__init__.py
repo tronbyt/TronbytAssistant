@@ -307,11 +307,13 @@ async def _async_register_services(
         publishtype = call.data.get(ATTR_PUBLISH_TYPE, DEFAULT_PUBLISH_TYPE)
         targets = _resolve_devices(call)
 
-        if coalesce_id and not validate_coalesce_id(coalesce_id):
-            raise HomeAssistantError(
-                "Coalesce ID must be at most 64 characters and contain only "
-                "letters, numbers, underscores, or dashes."
-            )
+        if coalesce_id:
+            coalesce_id = str(coalesce_id)
+            if not validate_coalesce_id(coalesce_id):
+                raise HomeAssistantError(
+                    "Coalesce ID must be at most 64 characters and contain only "
+                    "letters, numbers, underscores, or dashes."
+                )
 
         arguments: dict[str, Any] = {}
         if is_text:
