@@ -25,6 +25,8 @@ from homeassistant.util.color import color_rgb_to_hex, color_name_to_rgb
 
 from .const import (
     ATTR_ARGS,
+    ATTR_BACKGROUND_COLOR,
+    ATTR_COALESCE_ID,
     ATTR_COLOR,
     ATTR_CONTENT,
     ATTR_CONTENT_ID,
@@ -32,6 +34,7 @@ from .const import (
     ATTR_CUSTOM_CONT,
     ATTR_DEVICENANME,
     ATTR_DEVICE_IDS,
+    ATTR_EMOJI,
     ATTR_FONT,
     ATTR_PUBLISH_TYPE,
     ATTR_TEXT_TYPE,
@@ -43,8 +46,6 @@ from .const import (
     CONF_VERIFY_SSL,
     DATA_COORDINATOR,
     DOMAIN,
-    ATTR_BACKGROUND_COLOR,
-    ATTR_EMOJI,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -238,6 +239,13 @@ async def _async_register_services(
         pattern = r"^[A-Za-z0-9]+$"
         return bool(re.match(pattern, input_value))
 
+    def validate_coalesce_id(input_value: str) -> bool:
+        """Check if the coalesce ID is valid (alphanumeric, underscore, dash, max 64 chars)."""
+        if len(input_value) > 64:
+            return False
+        pattern = r"^[A-Za-z0-9_-]+$"
+        return bool(re.match(pattern, input_value))
+
     async def request(
         method: str,
         webhook_url: str,
@@ -295,8 +303,15 @@ async def _async_register_services(
 
     async def handle_push_or_text(call: ServiceCall, is_text: bool) -> None:
         contentid = call.data.get(ATTR_CONTENT_ID)
+        coalesce_id = call.data.get(ATTR_COALESCE_ID)
         publishtype = call.data.get(ATTR_PUBLISH_TYPE, DEFAULT_PUBLISH_TYPE)
         targets = _resolve_devices(call)
+
+        if coalesce_id and not validate_coalesce_id(coalesce_id):
+            raise HomeAssistantError(
+                "Coalesce ID must be at most 64 characters and contain only "
+                "letters, numbers, underscores, or dashes."
+            )
 
         arguments: dict[str, Any] = {}
         if is_text:
@@ -356,6 +371,8 @@ async def _async_register_services(
                 "app_id": content,
                 "installationID": contentid,
             }
+            if coalesce_id:
+                body["coalesceID"] = coalesce_id
             if publishtype:
                 body["publish"] = publishtype
             await request("POST", api_url, body)
