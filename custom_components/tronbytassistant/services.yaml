@@ -84,6 +84,11 @@ push:
           description: The Content ID you set when publishing your app. Specifying this adds the app to the rotation.
           selector:
             text: {}
+        coalesce_id: &coalesce_id
+          name: Coalesce ID
+          description: An optional identifier to deduplicate anonymous pushes. When set, only the most recent push with this ID is kept — older pushes are replaced. Max 64 chars, alphanumeric, underscores, and dashes only.
+          selector:
+            text: {}
         publishtype: &publishtype
           name: Publish Type
           description: How you want content published. Background publishes without replacing the current app and Foreground will publish and also show you the app instantly.
@@ -197,6 +202,7 @@ text:
                 - label: Title & Text
                   value: title
         contentid: *contentid
+        coalesce_id: *coalesce_id
         publishtype: *publishtype
 delete:
   name: Delete
